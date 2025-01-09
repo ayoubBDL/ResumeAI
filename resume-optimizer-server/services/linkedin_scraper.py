@@ -1,61 +1,103 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-import time
+import requests
+import re
+import os
+from typing import Dict
+from dotenv import load_dotenv
+import sys
 
-class LinkedInScraper:
+def log(msg):
+    print(msg, file=sys.stderr, flush=True)
+
+load_dotenv()
+
+class LinkedInJobScraper:
     def __init__(self):
-        self.setup_driver()
-
-    def setup_driver(self):
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
+        self.client_id = os.getenv('LINKEDIN_CLIENT_ID')
+        self.client_secret = os.getenv('LINKEDIN_CLIENT_SECRET')
+        log(f"LinkedIn scraper initialized with client_id: {self.client_id}")
         
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        if not self.client_id or not self.client_secret:
+            raise ValueError("LinkedIn API credentials not found in .env file")
 
-    async def scrape_job(self, url: str) -> dict:
+    def extract_job_id(self, url: str) -> str:
+        """Extract job ID from LinkedIn job URL"""
+        log(f"Extracting job ID from URL: {url}")
+        match = re.search(r'view/(\d+)', url)
+        if not match:
+            raise ValueError("Invalid LinkedIn job URL format")
+        job_id = match.group(1)
+        log(f"Extracted job ID: {job_id}")
+        return job_id
+
+    def get_access_token(self) -> str:
+        """Get LinkedIn API access token"""
+        log("Getting LinkedIn API access token...")
+        url = 'https://www.linkedin.com/oauth/v2/accessToken'
+        data = {
+            'grant_type': 'client_credentials',
+            'client_id': self.client_id,
+            'client_secret': self.client_secret
+        }
+        
+        log(f"Making request to {url}")
+        response = requests.post(url, data=data)
+        log(f"Response status: {response.status_code}")
+        log(f"Response body: {response.text}")
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to get access token: {response.text}")
+        
+        token_data = response.json()
+        log("Successfully got access token")
+        return token_data['access_token']
+
+    def get_job_details(self, url: str) -> Dict:
+        """Get job details from LinkedIn API"""
         try:
-            self.driver.get(url)
-            time.sleep(2)  # Allow page to load
-
-            # Wait for job details to load
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "job-details-jobs-unified-top-card__job-title"))
-            )
-
-            # Extract job information
-            job_data = {
-                "title": self.driver.find_element(By.CLASS_NAME, "job-details-jobs-unified-top-card__job-title").text.strip(),
-                "company": self.driver.find_element(By.CLASS_NAME, "job-details-jobs-unified-top-card__company-name").text.strip(),
-                "location": self.driver.find_element(By.CLASS_NAME, "job-details-jobs-unified-top-card__bullet").text.strip(),
-                "description": self.driver.find_element(By.CLASS_NAME, "job-details-jobs-unified-top-card__job-description").text.strip(),
+            log(f"\n=== Getting job details for URL: {url} ===")
+            
+            # Extract job ID
+            job_id = self.extract_job_id(url)
+            
+            # Get access token
+            access_token = self.get_access_token()
+            log("Got access token, making API request...")
+            
+            # Make API request for job details
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json',
+                'X-Restli-Protocol-Version': '2.0.0'
             }
-
-            # Extract requirements if available
-            try:
-                requirements = self.driver.find_elements(By.CSS_SELECTOR, ".job-details-jobs-unified-top-card__job-requirements li")
-                job_data["requirements"] = [req.text.strip() for req in requirements]
-            except:
-                job_data["requirements"] = []
-
-            return job_data
-
+            
+            api_url = f'https://api.linkedin.com/v2/jobs/{job_id}'
+            log(f"Making request to {api_url}")
+            
+            response = requests.get(api_url, headers=headers)
+            log(f"Response status: {response.status_code}")
+            log(f"Response body: {response.text}")
+            
+            if response.status_code != 200:
+                raise Exception(f"Failed to get job details: {response.text}")
+            
+            data = response.json()
+            log("Successfully got job details")
+            
+            # Extract and return relevant job details
+            result = {
+                'title': data.get('title', ''),
+                'company': data.get('companyName', ''),
+                'location': data.get('formattedLocation', ''),
+                'description': data.get('description', {}).get('text', ''),
+                'employmentType': data.get('employmentStatus', ''),
+                'industries': data.get('industries', []),
+                'postedAt': data.get('postingTimestamp')
+            }
+            log(f"Extracted job details: {result}")
+            return result
+            
         except Exception as e:
-            raise Exception(f"Failed to scrape LinkedIn job: {str(e)}")
-
-        finally:
-            self.driver.quit()
-
-    def __del__(self):
-        try:
-            self.driver.quit()
-        except:
-            pass
+            log(f"Error getting job details: {str(e)}")
+            import traceback
+            log(f"Traceback: {traceback.format_exc()}")
+            raise

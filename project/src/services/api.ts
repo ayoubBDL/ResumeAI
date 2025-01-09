@@ -23,25 +23,71 @@ export interface Resume {
   updated_at: string;
 }
 
+const API_URL = import.meta.env.VITE_RESUME_API_URL;
+
 // Resume optimization service
-export const optimizeResume = async (linkedinUrl: string, resumeFile: File, customInstructions?: string) => {
+export const optimizeResume = async (linkedinUrl: string, resumeFile: File) => {
+  // Validate inputs
+  if (!resumeFile || !linkedinUrl) {
+    throw new Error('Both resume file and LinkedIn URL are required');
+  }
+
+  if (!resumeFile.type.includes('pdf')) {
+    throw new Error('Please upload a PDF file');
+  }
+
+  if (resumeFile.size > 10 * 1024 * 1024) { // 10MB limit
+    throw new Error('File size must be less than 10MB');
+  }
+
   const formData = new FormData();
   formData.append('resume_file', resumeFile);
   formData.append('linkedin_url', linkedinUrl);
-  if (customInstructions) {
-    formData.append('custom_instructions', customInstructions);
+
+  console.log('Sending request to:', import.meta.env.VITE_RESUME_API_URL);
+  console.log('LinkedIn URL:', linkedinUrl);
+  console.log('Resume file:', resumeFile.name, 'Size:', resumeFile.size, 'Type:', resumeFile.type);
+  
+  try {
+    const response = await fetch(`${import.meta.env.VITE_RESUME_API_URL}/api/optimize-resume`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const contentType = response.headers.get('content-type');
+    console.log('Response content type:', contentType);
+    
+    if (!response.ok) {
+      let errorMessage = 'Failed to optimize resume';
+      try {
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } else {
+          errorMessage = await response.text();
+        }
+      } catch (parseError) {
+        console.error('Error parsing error response:', parseError);
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Handle successful response
+    console.log('Response successful');
+    if (contentType?.includes('application/pdf')) {
+      console.log('Received PDF response');
+      return await response.blob();
+    } else if (contentType?.includes('application/json')) {
+      console.log('Received JSON response');
+      return await response.json();
+    } else {
+      console.warn('Unexpected content type:', contentType);
+      return await response.blob();
+    }
+  } catch (error) {
+    console.error('Error in optimizeResume:', error);
+    throw error;
   }
-
-  const response = await fetch('http://localhost:8000/api/optimize-resume', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to optimize resume');
-  }
-
-  return response.json();
 };
 
 // Supabase database operations

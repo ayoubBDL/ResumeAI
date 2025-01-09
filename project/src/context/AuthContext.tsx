@@ -1,11 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { createClient, User, AuthResponse } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { User, AuthResponse } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabaseClient';
 
 interface AuthContextType {
   session: User | null;
