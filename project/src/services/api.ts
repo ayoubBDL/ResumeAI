@@ -26,66 +26,42 @@ export interface Resume {
 const API_URL = import.meta.env.VITE_RESUME_API_URL;
 
 // Resume optimization service
-export const optimizeResume = async (linkedinUrl: string, resumeFile: File) => {
-  // Validate inputs
-  if (!resumeFile || !linkedinUrl) {
-    throw new Error('Both resume file and LinkedIn URL are required');
+export const optimizeResume = async (jobUrl: string, resumeText: string) => {
+  if (!resumeText || !jobUrl) {
+    throw new Error('Both resume text and job URL are required');
   }
 
-  if (!resumeFile.type.includes('pdf')) {
-    throw new Error('Please upload a PDF file');
-  }
-
-  if (resumeFile.size > 10 * 1024 * 1024) { // 10MB limit
-    throw new Error('File size must be less than 10MB');
-  }
-
-  const formData = new FormData();
-  formData.append('resume_file', resumeFile);
-  formData.append('linkedin_url', linkedinUrl);
-
-  console.log('Sending request to:', import.meta.env.VITE_RESUME_API_URL);
-  console.log('LinkedIn URL:', linkedinUrl);
-  console.log('Resume file:', resumeFile.name, 'Size:', resumeFile.size, 'Type:', resumeFile.type);
-  
   try {
-    const response = await fetch(`${import.meta.env.VITE_RESUME_API_URL}/api/optimize-resume`, {
+    const response = await fetch(`${API_URL}/optimize`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jobUrl,
+        resume: resumeText
+      })
     });
 
-    const contentType = response.headers.get('content-type');
-    console.log('Response content type:', contentType);
-    
     if (!response.ok) {
-      let errorMessage = 'Failed to optimize resume';
-      try {
-        if (contentType?.includes('application/json')) {
-          const errorData = await response.json();
-          errorMessage = errorData.detail || errorMessage;
-        } else {
-          errorMessage = await response.text();
-        }
-      } catch (parseError) {
-        console.error('Error parsing error response:', parseError);
-      }
-      throw new Error(errorMessage);
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to optimize resume');
     }
 
-    // Handle successful response
-    console.log('Response successful');
-    if (contentType?.includes('application/pdf')) {
-      console.log('Received PDF response');
-      return await response.blob();
-    } else if (contentType?.includes('application/json')) {
-      console.log('Received JSON response');
-      return await response.json();
-    } else {
-      console.warn('Unexpected content type:', contentType);
-      return await response.blob();
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to optimize resume');
     }
+
+    return {
+      originalResume: data.data.originalResume,
+      optimizedResume: data.data.optimizedResume,
+      atsResume: data.data.atsResume,
+      jobDetails: data.data.jobDetails
+    };
   } catch (error) {
-    console.error('Error in optimizeResume:', error);
+    console.error('Error optimizing resume:', error);
     throw error;
   }
 };

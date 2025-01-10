@@ -1,86 +1,52 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from bs4 import BeautifulSoup
+from services.linkedin_scraper import LinkedInJobScraper
 import requests
-import time
-from urllib.parse import urlparse
-import os
 from dotenv import load_dotenv
-from openai import OpenAI
+import os
+import PyPDF2
+import io
 
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+OLLAMA_BASE_URL = "http://localhost:11434"  # Ollama API URL
 
-class LinkedInJobScraper:
-    def __init__(self):
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-        }
-        self.session = requests.Session()
-        self.session.headers.update(self.headers)
-
-    def validate_linkedin_url(self, url):
-        """Validate if the URL is a LinkedIn job posting URL"""
-        parsed = urlparse(url)
-        if not parsed.netloc.endswith('linkedin.com'):
-            raise ValueError("Not a valid LinkedIn URL")
-        if '/jobs/view/' not in url:
-            raise ValueError("Not a valid LinkedIn job posting URL")
-        return True
-
-    def get_job_details(self, url, max_retries=3):
-        """Get job details with retry mechanism and proper error handling"""
-        try:
-            self.validate_linkedin_url(url)
-            
-            for attempt in range(max_retries):
-                try:
-                    response = self.session.get(url, timeout=10)
-                    response.raise_for_status()
-                    
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.text, 'html.parser')
-                        
-                        job_title = self._safe_extract(soup, "h1", {"class": "top-card-layout__title"})
-                        company = self._safe_extract(soup, "a", {"class": "topcard__org-name-link"})
-                        description = self._safe_extract(soup, "div", {"class": "show-more-less-html__markup"})
-                        
-                        if not description:
-                            description = self._safe_extract(soup, "div", {"class": "description__text"})
-                        
-                        if not any([job_title, company, description]):
-                            raise ValueError("Could not extract job details")
-                        
-                        return {
-                            "title": job_title,
-                            "company": company,
-                            "description": description,
-                            "url": url
-                        }
-                    
-                except requests.RequestException as e:
-                    if attempt == max_retries - 1:
-                        raise
-                    time.sleep(2 ** attempt)
-                    continue
-                    
-        except Exception as e:
-            raise Exception(f"Failed to scrape job details: {str(e)}")
-
-    def _safe_extract(self, soup, tag, attrs):
-        """Safely extract text from BeautifulSoup object"""
-        element = soup.find(tag, attrs)
-        return element.get_text(strip=True) if element else ""
-
-# Initialize Flask
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Enable CORS for all routes
+
+def extract_text_from_pdf(pdf_file):
+    try:
+        # Read PDF file
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_file.read()))
+        
+        # Extract text from all pages
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        
+        return text.strip()
+    except Exception as e:
+        print(f"Error extracting text from PDF: {str(e)}")
+        raise Exception("Could not read PDF file. Please make sure it's a valid PDF.")
+
+def generate_with_ollama(prompt, system_prompt=""):
+    try:
+        # response = requests.post(
+        #     f"{OLLAMA_BASE_URL}/api/generate",
+        #     json={
+        #         "model": "llama3.1",  # or any other model you have pulled
+        #         "prompt": prompt,
+        #         "system": system_prompt,
+        #         "stream": False
+        #     }
+        # )
+        # response.raise_for_status()
+        # return response.json()["response"]
+        return prompt;
+    except Exception as e:
+        print(f"Ollama API error: {str(e)}")
+        raise
 
 @app.route('/')
 def home():
@@ -91,6 +57,7 @@ def home():
         "version": "1.0.0",
         "endpoints": {
             "GET /": "API information",
+            "GET /health": "Health check",
             "GET /test": "Test LinkedIn API connection",
             "POST /optimize": "Optimize resume for job posting"
         }
@@ -106,94 +73,143 @@ def health_check():
 
 @app.route('/test')
 def test():
-    """Test endpoint for LinkedIn scraping"""
     try:
         scraper = LinkedInJobScraper()
-        job_url = request.args.get('url', "https://www.linkedin.com/jobs/view/3754954736")
-        
+        job_url = "https://www.linkedin.com/jobs/view/4120998628"
         job_details = scraper.get_job_details(job_url)
-        
-        if not job_details.get('description'):
-            return jsonify({
-                "success": False,
-                "error": "Could not fetch job details"
-            }), 400
-            
         return jsonify({
             "success": True,
             "data": job_details
         })
-        
     except Exception as e:
+        print(f"Error: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
 
 @app.route('/optimize', methods=['POST'])
-def optimize():
-    """Endpoint to optimize resume based on job posting"""
+def optimize_resume():
     try:
-        # Validate request data
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                "success": False,
-                "error": "No JSON data provided"
-            }), 400
+        print("Request Content-Type:", request.content_type)
+        print("Request form:", request.form)
+        print("Request files:", request.files)
+        print("Request json:", request.get_json(silent=True))
 
-        job_url = data.get('job_url')
-        resume_text = data.get('resume')
-        
-        if not job_url or not resume_text:
-            return jsonify({
-                "success": False,
-                "error": "Missing required fields: job_url or resume"
-            }), 400
+        # Handle both JSON and form-data
+        if request.content_type and 'application/json' in request.content_type:
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    "success": False,
+                    "error": "No JSON data provided"
+                }), 400
+            
+            resume_text = data.get('resume')
+            job_url = data.get('jobUrl')
+            
+            if not resume_text or not job_url:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing resume text or job URL"
+                }), 400
+                
+        else:  # Handle multipart/form-data
+            if 'resume' not in request.files:
+                return jsonify({
+                    "success": False,
+                    "error": "No resume file provided"
+                }), 400
+                
+            resume_file = request.files['resume']
+            job_url = request.form.get('jobUrl')
+            
+            if not resume_file or not job_url:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing resume file or job URL"
+                }), 400
+                
+            if resume_file.filename.lower().endswith('.pdf'):
+                # Convert PDF to text
+                resume_text = extract_text_from_pdf(resume_file)
+            else:
+                # Assume it's text
+                resume_text = resume_file.read().decode('utf-8')
+
+        print(f"Job URL: {job_url}")
+        print(f"Resume text length: {len(resume_text)} characters")
         
         # Get job details
         scraper = LinkedInJobScraper()
         job_details = scraper.get_job_details(job_url)
+        print(f"Got job details for: {job_details.get('title', 'Unknown position')}")
         
-        # Prepare prompt for GPT
-        prompt = f"""
+        # Prepare prompt for optimization
+        optimize_prompt = f"""
         Job Description:
-        {job_details['description']}
-        
+        Title: {job_details['title']}
+        Company: {job_details['company']}
+        Description: {job_details['description']}
+
         Original Resume:
         {resume_text}
-        
-        Please optimize this resume for the job description above. Focus on:
-        1. Matching keywords and skills
-        2. Highlighting relevant experience
-        3. Quantifying achievements
-        4. Using active voice and impactful verbs
-        5. Maintaining truthfulness - do not invent experiences
-        
-        Format the response as a properly formatted resume.
+
+        Please optimize this resume for the job description above. Follow these instructions:
+        1. Match keywords and technical skills from the job description
+        2. Highlight relevant experience that aligns with the job requirements
+        3. Quantify achievements where possible
+        4. Use active voice and impactful verbs
+        5. Keep the same format as the original resume
+        6. Return only the optimized resume text, no explanations
+
+        Optimized Resume:
         """
         
-        # Call OpenAI API
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a professional resume writer and career coach."},
-                {"role": "user", "content": prompt}
-            ]
+        # Get optimized resume using Ollama
+        optimized_resume = generate_with_ollama(
+            optimize_prompt,
+            "You are a professional resume writer and career coach."
         )
         
-        optimized_resume = completion.choices[0].message.content
+        # Create ATS format prompt
+        ats_prompt = f"""
+        Convert this resume into an ATS-friendly format following these rules:
+        1. Use a clean, simple format with no fancy formatting
+        2. Include clear section headers (Summary, Experience, Education, Skills)
+        3. Remove any graphics, tables, columns, or special characters
+        4. Use standard bullet points (•)
+        5. Use common section titles that ATS systems recognize
+        6. Include all relevant keywords from the job description
+        7. Use a chronological format
+        8. Return only the ATS-formatted resume, no explanations
+
+        Resume to convert:
+        {optimized_resume}
+        
+        ATS-Friendly Format:
+        """
+        
+        # Get ATS version using Ollama
+        ats_resume = generate_with_ollama(
+            ats_prompt,
+            "You are an ATS optimization expert."
+        )
+        
+        print("Resume optimization complete!")
         
         return jsonify({
             "success": True,
             "data": {
-                "original_resume": resume_text,
-                "optimized_resume": optimized_resume,
-                "job_details": job_details
+                "originalResume": resume_text,
+                "optimizedResume": optimized_resume,
+                "atsResume": ats_resume,
+                "jobDetails": job_details
             }
         })
         
     except Exception as e:
+        print(f"Error: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -222,7 +238,7 @@ def main():
     
     # Configuration
     host = os.getenv('HOST', 'localhost')
-    port = int(os.getenv('PORT', 3000))
+    port = int(os.getenv('PORT', 5050))
     debug = os.getenv('DEBUG', 'True').lower() == 'true'
     
     print(f"\nServer Configuration:")
@@ -245,4 +261,8 @@ def main():
         return
 
 if __name__ == '__main__':
-    main()
+    print("Starting Resume Optimizer Server...")
+    print("Available endpoints:")
+    print("  GET  /test     - Test LinkedIn API")
+    print("  POST /optimize - Optimize resume")
+    app.run(host='localhost', port=5050)

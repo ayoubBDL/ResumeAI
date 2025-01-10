@@ -12,12 +12,11 @@ load_dotenv()
 
 class LinkedInJobScraper:
     def __init__(self):
-        self.client_id = os.getenv('LINKEDIN_CLIENT_ID')
-        self.client_secret = os.getenv('LINKEDIN_CLIENT_SECRET')
-        log(f"LinkedIn scraper initialized with client_id: {self.client_id}")
+        self.access_token = os.getenv('LINKEDIN_ACCESS_TOKEN')
+        log("LinkedIn scraper initialized")
         
-        if not self.client_id or not self.client_secret:
-            raise ValueError("LinkedIn API credentials not found in .env file")
+        if not self.access_token:
+            raise ValueError("LinkedIn access token not found in .env file")
 
     def extract_job_id(self, url: str) -> str:
         """Extract job ID from LinkedIn job URL"""
@@ -29,70 +28,64 @@ class LinkedInJobScraper:
         log(f"Extracted job ID: {job_id}")
         return job_id
 
-    def get_access_token(self) -> str:
-        """Get LinkedIn API access token"""
-        log("Getting LinkedIn API access token...")
-        url = 'https://www.linkedin.com/oauth/v2/accessToken'
-        data = {
-            'grant_type': 'client_credentials',
-            'client_id': self.client_id,
-            'client_secret': self.client_secret
-        }
-        
-        log(f"Making request to {url}")
-        response = requests.post(url, data=data)
-        log(f"Response status: {response.status_code}")
-        log(f"Response body: {response.text}")
-        
-        if response.status_code != 200:
-            raise Exception(f"Failed to get access token: {response.text}")
-        
-        token_data = response.json()
-        log("Successfully got access token")
-        return token_data['access_token']
-
     def get_job_details(self, url: str) -> Dict:
-        """Get job details from LinkedIn API"""
+        """Get job details using LinkedIn API"""
         try:
             log(f"\n=== Getting job details for URL: {url} ===")
             
             # Extract job ID
             job_id = self.extract_job_id(url)
             
-            # Get access token
-            access_token = self.get_access_token()
-            log("Got access token, making API request...")
-            
-            # Make API request for job details
             headers = {
-                'Authorization': f'Bearer {access_token}',
+                'Authorization': f'Bearer {self.access_token}',
                 'Content-Type': 'application/json',
-                'X-Restli-Protocol-Version': '2.0.0'
+                'X-Restli-Protocol-Version': '2.0.0',
+                'LinkedIn-Version': '202304'
             }
             
-            api_url = f'https://api.linkedin.com/v2/jobs/{job_id}'
-            log(f"Making request to {api_url}")
+            # Use the Jobs API with the correct endpoint
+            api_url = 'https://api.linkedin.com/v2/jobs'
+            params = {
+                'decorationId': 'com.linkedin.voyager.deco.jobs.web.shared.WebLightJobPosting-23',
+                'ids': job_id
+            }
             
-            response = requests.get(api_url, headers=headers)
+            log(f"Making request to {api_url} with params {params}")
+            response = requests.get(api_url, headers=headers, params=params)
             log(f"Response status: {response.status_code}")
             log(f"Response body: {response.text}")
             
             if response.status_code != 200:
-                raise Exception(f"Failed to get job details: {response.text}")
+                # Try alternative API endpoint
+                api_url = f'https://api.linkedin.com/rest/jobs/{job_id}'
+                log(f"Trying alternative endpoint: {api_url}")
+                response = requests.get(api_url, headers=headers)
+                log(f"Response status: {response.status_code}")
+                log(f"Response body: {response.text}")
+                
+                if response.status_code != 200:
+                    raise Exception(f"Failed to get job details: {response.text}")
             
             data = response.json()
             log("Successfully got job details")
             
-            # Extract and return relevant job details
+            # Extract job details from response
+            job_data = data.get('elements', [{}])[0] if 'elements' in data else data
+            
             result = {
-                'title': data.get('title', ''),
-                'company': data.get('companyName', ''),
-                'location': data.get('formattedLocation', ''),
-                'description': data.get('description', {}).get('text', ''),
-                'employmentType': data.get('employmentStatus', ''),
-                'industries': data.get('industries', []),
-                'postedAt': data.get('postingTimestamp')
+                'title': job_data.get('title', ''),
+                'company': job_data.get('companyName', '') or job_data.get('company', {}).get('name', ''),
+                'location': job_data.get('formattedLocation', '') or job_data.get('location', ''),
+                'description': (
+                    job_data.get('description', {}).get('text', '') or 
+                    job_data.get('description', '') or 
+                    job_data.get('jobDescription', '')
+                ),
+                'employmentType': job_data.get('employmentStatus', '') or job_data.get('employmentType', ''),
+                'industries': job_data.get('industries', []),
+                'url': url
             }
+            
             log(f"Extracted job details: {result}")
             return result
             

@@ -26,7 +26,7 @@ class OpenAIOptimizer:
 
             # Call OpenAI API
             response = openai.ChatCompletion.create(
-                model="gpt-4",  # or gpt-3.5-turbo
+                model="GPT-4o mini",  # or gpt-3.5-turbo
                 messages=[
                     {"role": "system", "content": "You are an expert resume optimizer with years of experience in HR and recruitment."},
                     {"role": "user", "content": prompt}
@@ -35,6 +35,7 @@ class OpenAIOptimizer:
                 max_tokens=4000
             )
 
+            
             # Parse the response
             return self._parse_response(response.choices[0].message.content)
 

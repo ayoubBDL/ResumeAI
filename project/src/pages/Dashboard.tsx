@@ -39,21 +39,16 @@ export default function Dashboard() {
     }
 
     setIsUploading(true);
-    setUploadStatus('Optimizing your resume...');
+    setUploadStatus('Reading resume file...');
     
     try {
       console.log('Starting resume optimization...');
-      console.log('File:', file.name, 'Size:', file.size, 'Type:', file.type);
       
-      // Validate file type and size
-      if (!file.type.includes('pdf')) {
-        throw new Error('Please upload a PDF file');
-      }
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        throw new Error('File size must be less than 10MB');
-      }
-
-      const result = await optimizeResume(linkedinUrl, file);
+      // Read the file content
+      const fileText = await file.text();
+      console.log('File content read successfully');
+      
+      const result = await optimizeResume(linkedinUrl, fileText);
       console.log('Optimization successful');
       
       setUploadStatus('Resume optimized successfully!');
