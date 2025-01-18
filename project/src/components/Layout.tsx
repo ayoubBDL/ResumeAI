@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut } from 'lucide-react';
 
-export function Layout({ children }: { children: React.ReactNode }) {
+const Layout = ({ children }: { children: React.ReactNode }) => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,10 +50,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="p-4 border-t">
+          <div className="px-4 py-4 border-t">
             <button
               onClick={handleSignOut}
-              className="flex items-center w-full px-2 py-2 text-gray-600 hover:bg-gray-50 rounded-md"
+              className="flex items-center w-full px-2 py-2 text-gray-600 rounded-md hover:bg-gray-50"
             >
               <LogOut className="h-5 w-5 mr-3" />
               Sign Out
@@ -62,10 +62,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main Content */}
       <div className="pl-64">
-        {children}
+        <main className="py-6">
+          {children}
+        </main>
       </div>
     </div>
   );
-}
+};
+
+export default Layout;

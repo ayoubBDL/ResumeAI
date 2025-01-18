@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout } from '../components/Layout';
+import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { getJobApplications, updateJobApplicationStatus, JobApplication } from '../services/api';
 

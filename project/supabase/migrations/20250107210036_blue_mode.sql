@@ -21,27 +21,56 @@
     - Add policies for user data access
 */
 
--- Create profiles table
-CREATE TABLE profiles (
-  id uuid REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
+-- Create profiles and resumes tables if they don't exist
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'profiles') THEN
+        CREATE TABLE profiles (
+            id uuid REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
+        );
+    END IF;
 
--- Create resumes table
-CREATE TABLE resumes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
-  original_filename text NOT NULL,
-  optimized_filename text,
-  job_url text NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  status text DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed'))
-);
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'resumes') THEN
+        CREATE TABLE resumes (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+            original_filename text NOT NULL,
+            optimized_filename text,
+            job_url text NOT NULL,
+            created_at timestamptz DEFAULT now(),
+            status text DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed'))
+        );
+
+        -- Enable RLS
+        ALTER TABLE resumes ENABLE ROW LEVEL SECURITY;
+
+        -- Resumes policies
+        CREATE POLICY "Users can view own resumes"
+          ON resumes FOR SELECT
+          TO authenticated
+          USING (user_id = auth.uid());
+
+        CREATE POLICY "Users can insert own resumes"
+          ON resumes FOR INSERT
+          TO authenticated
+          WITH CHECK (user_id = auth.uid());
+
+        CREATE POLICY "Users can update own resumes"
+          ON resumes FOR UPDATE
+          TO authenticated
+          USING (user_id = auth.uid());
+
+        CREATE POLICY "Users can delete own resumes"
+          ON resumes FOR DELETE
+          TO authenticated
+          USING (user_id = auth.uid());
+    END IF;
+END $$;
 
 -- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE resumes ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
 CREATE POLICY "Users can view own profile"
@@ -53,27 +82,6 @@ CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   TO authenticated
   USING (auth.uid() = id);
-
--- Resumes policies
-CREATE POLICY "Users can view own resumes"
-  ON resumes FOR SELECT
-  TO authenticated
-  USING (user_id = auth.uid());
-
-CREATE POLICY "Users can insert own resumes"
-  ON resumes FOR INSERT
-  TO authenticated
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "Users can update own resumes"
-  ON resumes FOR UPDATE
-  TO authenticated
-  USING (user_id = auth.uid());
-
-CREATE POLICY "Users can delete own resumes"
-  ON resumes FOR DELETE
-  TO authenticated
-  USING (user_id = auth.uid());
 
 -- Function to handle profile creation
 CREATE OR REPLACE FUNCTION handle_new_user()
