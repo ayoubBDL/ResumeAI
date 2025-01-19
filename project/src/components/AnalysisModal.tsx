@@ -9,55 +9,85 @@ interface AnalysisModalProps {
 export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisModalProps) {
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-        <div className="flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Resume Analysis</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <span className="sr-only">Close</span>
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div className="mt-2 space-y-4">
-            {analysis.split('\n').map((line, index) => {
-              if (line.trim().length === 0) return null;
-              
-              // Check if it's a section header
-              if (line.includes(':')) {
-                const [header, content] = line.split(':');
-                return (
-                  <div key={index}>
-                    <h4 className="font-medium text-indigo-600">{header.trim()}</h4>
-                    <p className="text-gray-600 mt-1">{content.trim()}</p>
-                  </div>
-                );
-              }
-              
-              // Regular line
-              return (
-                <p key={index} className="text-gray-600">
-                  {line.trim()}
-                </p>
-              );
-            })}
-          </div>
+  // Parse the analysis sections
+  const sections = {
+    improvements: analysis.split('1. KEY IMPROVEMENTS MADE:')[1]?.split('2. INTERVIEW PREPARATION ADVICE:')[0]?.trim() || '',
+    interview: analysis.split('2. INTERVIEW PREPARATION ADVICE:')[1]?.split('3. NEXT STEPS:')[0]?.trim() || '',
+    nextSteps: analysis.split('3. NEXT STEPS:')[1]?.trim() || ''
+  };
 
-          <div className="mt-4">
-            <button
-              onClick={onClose}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
-            >
-              Close
-            </button>
-          </div>
+  const formatBulletPoints = (text: string) => {
+    if (!text) return [];
+    return text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && line.startsWith('•'))
+      .map(line => line.replace(/^•\s*/, '').trim());
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex" onClick={handleBackdropClick}>
+      <div className="relative p-8 bg-white w-full max-w-3xl m-auto rounded-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Resume Analysis
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <span className="text-2xl leading-none">&times;</span>
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Key Improvements */}
+          <section className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Key Improvements Made</h3>
+            </div>
+            <div className="p-4">
+              <ul className="list-disc pl-5 space-y-2">
+                {formatBulletPoints(sections.improvements).map((point, index) => (
+                  <li key={index} className="text-gray-700">{point}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          {/* Interview Preparation */}
+          <section className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Interview Preparation Advice</h3>
+            </div>
+            <div className="p-4">
+              <ul className="list-disc pl-5 space-y-2">
+                {formatBulletPoints(sections.interview).map((point, index) => (
+                  <li key={index} className="text-gray-700">{point}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          {/* Next Steps */}
+          <section className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Next Steps</h3>
+            </div>
+            <div className="p-4">
+              <ul className="list-disc pl-5 space-y-2">
+                {formatBulletPoints(sections.nextSteps).map((point, index) => (
+                  <li key={index} className="text-gray-700">{point}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
         </div>
       </div>
     </div>

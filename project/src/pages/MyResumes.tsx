@@ -11,18 +11,19 @@ const MyResumes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchResumes = async () => {
-      try {
-        const data = await getRecentResumes();
-        setResumes(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch resumes');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchResumes = async () => {
+    try {
+      setLoading(true);
+      const data = await getRecentResumes();
+      setResumes(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch resumes');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchResumes();
   }, []);
 
@@ -46,7 +47,11 @@ const MyResumes = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {resumes.map((resume) => (
-              <ResumeCard key={resume.id} resume={resume} />
+              <ResumeCard 
+                key={resume.id} 
+                resume={resume} 
+                onUpdate={fetchResumes}
+              />
             ))}
           </div>
         )}

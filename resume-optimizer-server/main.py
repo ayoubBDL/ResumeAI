@@ -4,8 +4,9 @@ from openai import OpenAI
 import requests
 import json
 import io
+import base64
 import pdfplumber
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, make_response
 from flask_cors import CORS
 from services.linkedin_batch_scraper import LinkedInJobScraper
 from reportlab.lib import colors
@@ -16,7 +17,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowabl
 import re
 import tempfile
 import time
-import base64
 
 # Load environment variables
 load_dotenv()
@@ -89,43 +89,65 @@ def generate_with_openai(prompt):
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Using the original model
             messages=[
-                {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to provide a comprehensive analysis in these key areas:
+                {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
 
-1. Resume Optimization:
-   - Identify key skills and experience gaps
-   - Suggest specific modifications to match job requirements
-   - Add relevant technical keywords and industry terms
-   - Improve quantifiable achievements
+        CRITICAL - ABSOLUTELY REQUIRED RULES:
+        1. JOB MATCHING (HIGHEST PRIORITY):
+           ‼️ Analyze the job description thoroughly
+           ‼️ Identify key requirements, skills, and qualifications
+           ‼️ Reorganize and emphasize resume content to match job requirements
+           ‼️ Use similar terminology as the job description
+           ‼️ Highlight experiences that directly relate to job requirements
+           ‼️ Ensure technical skills match what's asked in the job
 
-2. Technical Interview Preparation:
-   - List specific technical topics to study based on job requirements
-   - Provide example technical questions and suggested answers
-   - Recommend coding challenges related to the role's tech stack
-   - Suggest system design scenarios to practice
-   - Include relevant documentation and resources to review
+        PART 1: OPTIMIZED RESUME
+        =======================
+        Create a clean, professional resume with these sections:
+        1. Contact Information (keep original details)
+        2. Professional Summary (concise, impactful)
+        3. Technical Skills (prioritize job-relevant skills)
+        4. Professional Experience (emphasize relevant achievements)
+        5. Education (keep as in original)
 
-3. Behavioral Interview Preparation:
-   - Prepare STAR format responses using the candidate's experience
-   - Suggest specific projects to highlight during interviews
-   - Provide example behavioral questions and how to answer them
-   - Include leadership and team collaboration scenarios
-   - Recommend ways to discuss challenges and solutions
+        FORMAT RULES:
+        - NO headers like "ATS-FRIENDLY" or separator lines
+        - Clean, minimal formatting
+        - Use bullet points (•) for experience and skills
+        - Consistent spacing
+        - No tables or columns
 
-4. Company Research and Culture Fit:
-   - Highlight industry trends relevant to the role
-   - Suggest questions to ask interviewers
-   - Identify company values and how to demonstrate alignment
-   - Research points about company technology and projects
-   - Tips for discussing career growth and goals
+        PART 2: IMPROVEMENT ANALYSIS
+        ===========================
+        Provide a structured analysis with these sections:
 
-5. Practical Preparation Steps:
-   - Create a study timeline with specific topics
-   - List tools and technologies to practice
-   - Suggest mock interview exercises
-   - Recommend portfolio projects to build
-   - Provide resources for further learning
+        1. KEY IMPROVEMENTS MADE:
+        • List specific improvements made to the resume (use bullet points)
+        • Explain how each change better targets the job
+        • Highlight key skills and experiences emphasized
 
-Format the response to focus on ACTIONABLE preparation steps. Each suggestion should be specific and tied to the job requirements. Include example questions, scenarios, and concrete study materials."""},
+        2. INTERVIEW PREPARATION ADVICE:
+        • Key talking points for the interview
+        • How to discuss the highlighted experiences
+        • Technical topics to review
+        • Potential questions to prepare for
+        • STAR method examples for key achievements
+
+        3. NEXT STEPS:
+        • Additional skills to develop
+        • Certifications to consider
+        • Portfolio suggestions
+        • Networking recommendations
+
+        FINAL CHECK - VERIFY:
+        1. Resume is SPECIFICALLY TAILORED to job description
+        2. ALL experience is included but PRIORITIZED for relevance
+        3. Skills and technologies MATCH job requirements
+        4. NO fictional or assumed information
+        5. Original contact details preserved
+        6. Both PART 1 and PART 2 included with clear separation
+
+        ‼️ IMPORTANT: Show the COMPLETE response with both parts clearly separated.
+        """},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -196,11 +218,10 @@ def create_pdf_from_text(text):
                 name='SectionHeading',
                 parent=styles['Heading2'],
                 fontSize=14,
-                spaceBefore=16,
-                spaceAfter=12,
+                spaceBefore=12,
+                spaceAfter=8,
                 textColor=colors.HexColor('#2C3E50'),
-                fontName='Helvetica-Bold',
-                borderPadding=(0, 0, 8, 0),  # bottom padding for underline
+                fontName='Helvetica-Bold'
             ))
             
             # Normal text style
@@ -208,7 +229,7 @@ def create_pdf_from_text(text):
                 name='NormalText',
                 parent=styles['Normal'],
                 fontSize=11,
-                spaceAfter=8,
+                spaceAfter=6,
                 fontName='Helvetica',
                 leading=14
             ))
@@ -228,10 +249,15 @@ def create_pdf_from_text(text):
             lines = text.split('\n')
             current_section = []
             in_contact_section = False
+            skip_next = False
             
             for line in lines:
                 line = line.strip()
                 if not line:
+                    continue
+                
+                # Skip ATS header and separator lines
+                if "ATS-FRIENDLY" in line or "=" * 10 in line:
                     continue
                 
                 # Remove markers and clean up the text
@@ -242,45 +268,27 @@ def create_pdf_from_text(text):
                     continue
                 
                 # Handle different sections
-                if "CONTACT SECTION" in line.upper():
-                    in_contact_section = True
-                    story.append(Spacer(1, 20))
-                    continue
-                elif "PROFESSIONAL SUMMARY" in line.upper():
-                    in_contact_section = False
-                    # Add a divider
-                    story.append(HRFlowable(
-                        width="100%",
-                        thickness=1,
-                        color=colors.HexColor('#BDC3C7'),
-                        spaceBefore=8,
-                        spaceAfter=8
+                if "PROFESSIONAL SUMMARY" in line.upper():
+                    story.append(Paragraph("Summary", styles['SectionHeading']))
+                elif "PROFESSIONAL EXPERIENCE" in line.upper():
+                    story.append(Paragraph("Experience", styles['SectionHeading']))
+                elif "EDUCATION" in line.upper():
+                    story.append(Paragraph("Education", styles['SectionHeading']))
+                elif "SKILLS" in line.upper():
+                    story.append(Paragraph("Skills", styles['SectionHeading']))
+                elif "CONTACT SECTION" in line.upper():
+                    continue  # Skip this header
+                elif line.startswith('[LinkedIn]'):
+                    # Clean up LinkedIn URL
+                    url = re.search(r'\((.*?)\)', line).group(1)
+                    story.append(Paragraph(f'LinkedIn: {url}', styles['ContactInfo']))
+                elif ':' in line and not in_contact_section:
+                    # Handle contact info
+                    label, value = line.split(':', 1)
+                    story.append(Paragraph(
+                        f'{label.strip()}: {value.strip()}',
+                        styles['ContactInfo']
                     ))
-                    story.append(Paragraph(line.title(), styles['SectionHeading']))
-                elif "PROFESSIONAL EXPERIENCE" in line.upper() or "EDUCATION" in line.upper() or "SKILLS" in line.upper():
-                    # Add a divider before new main sections
-                    story.append(HRFlowable(
-                        width="100%",
-                        thickness=1,
-                        color=colors.HexColor('#BDC3C7'),
-                        spaceBefore=8,
-                        spaceAfter=8
-                    ))
-                    story.append(Paragraph(line.title(), styles['SectionHeading']))
-                elif in_contact_section:
-                    # Special handling for contact section
-                    if ":" in line:
-                        label, value = line.split(":", 1)
-                        story.append(Paragraph(
-                            f'<b>{label.strip()}:</b> {value.strip()}',
-                            styles['ContactInfo']
-                        ))
-                    else:
-                        # Assume it's the name if it's the first line of contact
-                        if not story:  # If this is the very first line
-                            story.append(Paragraph(line, styles['Name']))
-                        else:
-                            story.append(Paragraph(line, styles['ContactInfo']))
                 elif line.startswith('•') or line.startswith('-'):
                     # Add bullet point
                     current_section.append(line[1:].strip())
@@ -292,11 +300,16 @@ def create_pdf_from_text(text):
                             [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
                             bulletType='bullet',
                             leftIndent=20,
-                            spaceBefore=6,
-                            spaceAfter=6
+                            spaceBefore=4,
+                            spaceAfter=4
                         ))
                         current_section = []
-                    story.append(Paragraph(line, styles['NormalText']))
+                    
+                    # Check if this is the name (first non-header line)
+                    if not story:
+                        story.append(Paragraph(line, styles['Name']))
+                    else:
+                        story.append(Paragraph(line, styles['NormalText']))
             
             # Add any remaining bullet points
             if current_section:
@@ -304,8 +317,8 @@ def create_pdf_from_text(text):
                     [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
                     bulletType='bullet',
                     leftIndent=20,
-                    spaceBefore=6,
-                    spaceAfter=6
+                    spaceBefore=4,
+                    spaceAfter=4
                 ))
             
             # Build PDF
@@ -536,145 +549,112 @@ def optimize_resume():
         
         # Prepare prompt for AI model
         print("[Optimize] Preparing prompt for optimization...")
-        prompt = f"""You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
+        prompt = f"""You are an expert ATS optimization and career advisor. Analyze this resume for a {job_details['title']} position and provide TWO parts: an optimized resume and a detailed analysis.
 
-        CRITICAL - ABSOLUTELY REQUIRED RULES:
-        1. JOB MATCHING (HIGHEST PRIORITY):
-           ‼️ Analyze the job description thoroughly
-           ‼️ Identify key requirements, skills, and qualifications
-           ‼️ Reorganize and emphasize resume content to match job requirements
-           ‼️ Use similar terminology as the job description
-           ‼️ Highlight experiences that directly relate to job requirements
-           ‼️ Ensure technical skills match what's asked in the job
-
-        2. PROFESSIONAL EXPERIENCE:
-           ‼️ Look for the "PROFESSIONAL EXPERIENCE" or "WORK EXPERIENCE" section
-           ‼️ For each position, include and ADAPT:
-              - Exact company name and job title
-              - Exact dates
-              - Responsibilities that align with job requirements
-              - Achievements relevant to the target position
-              - Tools and technologies that match job needs
-           ‼️ Emphasize experiences that match job requirements
-           ‼️ Use action verbs and metrics from original resume
-
-        3. TECHNICAL SKILLS:
-           ‼️ Prioritize skills mentioned in job description
-           ‼️ Match terminology with job requirements
-           ‼️ Group skills by relevance to the position
-           ‼️ Keep all original skills but highlight matching ones
-
-        4. PROJECTS:
-           ‼️ Prioritize projects using similar technologies
-           ‼️ Emphasize projects relevant to job requirements
-           ‼️ Keep technical details that align with position
-
-        5. CONTACT AND EDUCATION:
-           ‼️ Keep all contact information exactly as in resume
-           ‼️ Include education details unchanged
-           ‼️ Never modify or assume contact details
-
-        Job Description to Target:
-        {job_details['description']}
-        
         Original Resume:
         {resume_text}
-        
-        Your response MUST include BOTH parts:
 
-        PART 1: ATS-FRIENDLY RESUME TARGETING THIS POSITION
-        ===================================================
-        1. CONTACT SECTION:
-           - Only information from original resume
-           - Clean, professional format
+        Job Description:
+        {job_details['description']}
 
-        2. PROFESSIONAL SUMMARY:
-           - Tailored to job requirements
-           - Highlight matching qualifications
-           - Focus on relevant experience
+        Provide your response in TWO clearly marked sections:
 
-        3. PROFESSIONAL EXPERIENCE:
-           - Prioritize experiences matching job needs
-           - Use relevant achievements and metrics
-           - Emphasize matching skills and tools
-           - Keep all positions but focus on relevant details
+        PART 1: OPTIMIZED RESUME
+        =======================
+        Create a clean, professional resume with these sections:
+        1. Contact Information (keep original details)
+        2. Summary (2-3 lines highlighting most relevant qualifications)
+        3. Skills (prioritize relevant technical skills)
+        4. Experience (emphasize achievements and metrics)
+        5. Education (if present in original)
 
-        4. TECHNICAL SKILLS:
-           - Prioritize skills mentioned in job
-           - Group by relevance to position
-           - Match job description terminology
+        Format Rules:
+        - Remove any "ATS-FRIENDLY" headers or separator lines
+        - Use clean, consistent formatting
+        - Use bullet points (•) for experience and skills
+        - Keep original dates and company names
+        - Highlight metrics and achievements
 
-        5. PROJECTS:
-           - Highlight relevant projects first
-           - Emphasize matching technologies
-           - Focus on relevant outcomes
+        PART 2: DETAILED ANALYSIS
+        =======================
 
-        6. EDUCATION:
-           - Keep as in original
+        1. KEY IMPROVEMENTS MADE:
+        • List 3-5 specific improvements made to the resume
+        • Focus on content reorganization and emphasis
+        • Explain how each change improves ATS matching
+        • Highlight key skills and experiences emphasized
 
-        FORMAT REQUIREMENTS:
-        - ATS-friendly format
-        - Clear section headers
-        - Bullet points (•)
-        - Consistent spacing
-        - No tables or columns
+        2. INTERVIEW PREPARATION ADVICE:
+        • Prepare 3-4 STAR stories from your experience
+        • Key technical topics to review based on job requirements
+        • Suggested responses to common questions
+        • Projects or achievements to highlight
+        • Questions to ask the interviewer
 
-        PART 2: OPTIMIZATION ANALYSIS
-        ============================
-        1. MATCH ANALYSIS:
-           - Key job requirements and how resume matches
-           - Critical skills alignment
-           - Experience relevance
-           - Technical skills match
+        3. NEXT STEPS:
+        • Skills to develop or strengthen
+        • Certifications that would add value
+        • Portfolio projects to consider
+        • Industry knowledge to research
 
-        2. IMPROVEMENT SUGGESTIONS:
-           - Skills to emphasize
-           - Experiences to highlight
-           - Keywords to add
-           - Areas to strengthen
-
-        FINAL CHECK - VERIFY:
-        1. Resume is SPECIFICALLY TAILORED to job description
-        2. ALL experience is included but PRIORITIZED for relevance
-        3. Skills and technologies MATCH job requirements
-        4. NO fictional or assumed information
-        5. Original contact details preserved
-        6. Both PART 1 and PART 2 included
-
-        ‼️ IMPORTANT: Show the COMPLETE response, not just a preview. Include both PART 1 and PART 2 in full.
+        IMPORTANT RULES:
+        1. MUST provide all three sections in Part 2
+        2. Use bullet points (•) for all lists
+        3. Be specific and actionable in recommendations
+        4. Focus on the job requirements
+        5. Maintain all original experience and dates
         """
+
+        print("[Optimize] Sending request to AI model...")
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert ATS optimization and career advisor. Provide detailed, specific advice for both resume optimization and interview preparation."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2500
+        )
+
+        # Extract the response
+        ai_response = response.choices[0].message.content.strip()
         
-        # Generate optimization suggestions using selected model
-        print(f"[Optimize] Generating suggestions using OpenAI...")
-        suggestions = generate_with_openai(prompt)
+        # Split the response into resume and analysis parts using the correct marker
+        parts = ai_response.split("PART 2: DETAILED ANALYSIS")
+        optimized_resume = parts[0].split("PART 1: OPTIMIZED RESUME")[-1].strip() if len(parts) > 0 else ""
+        analysis = parts[1].strip() if len(parts) > 1 else ""
         
-        # Split response into resume and analysis
-        resume_text, analysis_text = split_ai_response(suggestions)
+        print("[DEBUG] Analysis extracted:", analysis)
+        
+        # Create the response object
+        response_data = {
+            "optimized_resume": optimized_resume,
+            "analysis": analysis
+        }
+
+        print("[DEBUG] Final response data:", response_data)
         
         # Generate PDF from resume text
         print("[Optimize] Generating optimized resume PDF...")
-        temp_pdf_path = create_pdf_from_text(resume_text)
+        temp_pdf_path = create_pdf_from_text(optimized_resume)
         
         try:
             # Read the PDF file into memory
             with open(temp_pdf_path, 'rb') as pdf_file:
                 pdf_data = pdf_file.read()
                 
-            # Create response with PDF data
-            response = send_file(
-                io.BytesIO(pdf_data),
-                mimetype='application/pdf',
-                as_attachment=True,
-                download_name=f"optimized_{resume_file.filename}"
-            )
+            # Create JSON response with PDF data and analysis
+            response = jsonify({
+                "success": True,
+                "analysis": analysis,
+                "pdf_data": base64.b64encode(pdf_data).decode('utf-8')
+            })
             
-            # Set content disposition and type
-            response.headers['Content-Disposition'] = f'attachment; filename="optimized_{resume_file.filename}"'
-            response.headers['Content-Type'] = 'application/pdf'
+            # Set content type to application/json
+            response.headers['Content-Type'] = 'application/json'
             
-            print("[Optimize] Sending PDF response...")
+            print("[Optimize] Sending JSON response with PDF and analysis...")
             return response
-            
         except Exception as e:
             print(f"[Optimize ERROR] Error sending PDF: {str(e)}")
             raise e
@@ -699,6 +679,11 @@ def optimize_resume():
                 os.unlink(temp_pdf_path)
             except Exception as e:
                 print(f"[Optimize WARNING] Failed to clean up temp file: {str(e)}")
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    # Remove the delete endpoint since we're handling it in the frontend
+    pass
 
 def validate_environment():
     """Validate required environment variables"""

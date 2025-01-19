@@ -46,7 +46,7 @@ class OpenAIOptimizer:
                          job_title: str, company: str, 
                          custom_instructions: str = None) -> str:
         prompt = f"""
-        Your task is to optimize the following resume for the position of {job_title} at {company}.
+        You are an expert resume optimizer with deep experience in technical recruitment and HR. Your task is to optimize the following resume for the position of {job_title} at {company}.
 
         Job Description:
         {job_description}
@@ -56,52 +56,125 @@ class OpenAIOptimizer:
 
         {f'Additional Instructions: {custom_instructions}' if custom_instructions else ''}
 
-        Please optimize the resume following these guidelines:
-        1. Match keywords and skills from the job description
-        2. Quantify achievements where possible
-        3. Use action verbs
-        4. Maintain ATS-friendly formatting
-        5. Highlight relevant experience
-        6. Remove irrelevant information
-        7. Ensure proper ordering of information
-        8. Add any missing relevant skills from the job description
+        Follow these optimization guidelines carefully:
 
-        Provide your response in the following format:
-        SUMMARY:
-        [Brief summary of changes made]
+        1. RESUME STRUCTURE AND FORMATTING:
+           - Use markdown formatting: *** for main section titles, ** for subtitles
+           - Maintain consistent spacing between sections
+           - Ensure clear visual hierarchy
+           - Use bullet points for achievements and responsibilities
+           - Keep formatting ATS-friendly
 
-        OPTIMIZED_RESUME:
-        [The complete optimized resume text]
+        2. REQUIRED SECTIONS (in order):
+           a) ***PERSONAL INFORMATION***
+              - Full name (prominently displayed)
+              - Professional title aligned with job
+              - Contact details (phone, email)
+              - Location
+              - LinkedIn/GitHub profiles
 
-        CHANGES_MADE:
-        [Bullet points of significant changes]
+           b) ***PROFESSIONAL SUMMARY***
+              - 3-4 impactful sentences
+              - Highlight years of experience
+              - Mention key technical expertise
+              - Align with job requirements
+
+           c) ***TECHNICAL SKILLS***
+              Group into clear categories:
+              - Programming Languages
+              - Frameworks & Libraries
+              - Databases & Storage
+              - Cloud & DevOps
+              - Tools & Methodologies
+              - Soft Skills
+
+           d) ***PROFESSIONAL EXPERIENCE***
+              For each role:
+              - Company name and location
+              - Position title
+              - Dates (MM/YYYY)
+              - 4-6 achievement-focused bullets
+              - Include metrics and technical details
+              - Match keywords from job description
+
+           e) ***PROJECTS***
+              For each significant project:
+              - Project name and purpose
+              - Technologies used
+              - Your role and responsibilities
+              - Quantifiable outcomes
+              - Links to live demos/repositories
+
+           f) ***EDUCATION***
+              - Degree and major
+              - Institution name
+              - Graduation date
+              - Relevant coursework (if applicable)
+              - Academic achievements
+
+           g) ***CERTIFICATIONS*** (if any)
+              - Name of certification
+              - Issuing organization
+              - Date obtained/expiration
+
+           h) ***LANGUAGES***
+              - List languages with proficiency levels
+
+        3. CONTENT OPTIMIZATION:
+           - Use strong action verbs
+           - Include specific technical terms from job description
+           - Quantify achievements with metrics
+           - Highlight leadership and collaboration
+           - Show problem-solving abilities
+           - Demonstrate business impact
+
+        4. TECHNICAL DETAILS:
+           - Mention specific versions of technologies
+           - Include methodologies and best practices
+           - Show full stack capabilities
+           - Highlight scalability and performance improvements
+           - Include security and optimization work
+
+        5. KEYWORDS AND ATS:
+           - Include exact matches from job description
+           - Add industry-standard variations
+           - Spell out acronyms
+           - Use recognized industry terms
+
+        PART 1: OPTIMIZED RESUME
+        Provide the complete optimized resume text here, using the markdown formatting and structure specified above.
+
+        PART 2: DETAILED ANALYSIS
+        1. KEY IMPROVEMENTS MADE:
+        - List specific optimizations and their alignment with job requirements
+        - Explain how each major change improves match with job description
+
+        2. INTERVIEW PREPARATION ADVICE:
+        - Key technical areas to prepare for based on job requirements
+        - Specific projects/experiences to highlight in interviews
+        - Potential technical questions based on job requirements
+
+        3. NEXT STEPS:
+        - Recommended certifications or skills to acquire
+        - Areas for improvement
+        - Additional ways to strengthen the application
+
+        Ensure each section is properly formatted with markdown titles and maintain consistent spacing throughout the resume.
+        Focus on creating a clean, professional layout while incorporating all relevant information from the original resume.
         """
         return prompt
 
     def _parse_response(self, response: str) -> Dict:
-        sections = response.split('\n\n')
-        result = {
-            "summary": "",
-            "optimized_resume": "",
-            "changes": []
+        # Split into resume and analysis parts
+        parts = response.split('PART 2: DETAILED ANALYSIS')
+        
+        # Get the resume part
+        resume_part = parts[0].split('PART 1: OPTIMIZED RESUME')[-1].strip()
+        
+        # Get the analysis part
+        analysis_part = parts[1].strip() if len(parts) > 1 else ""
+        
+        return {
+            "optimized_resume": resume_part,
+            "analysis": analysis_part
         }
-
-        current_section = None
-        for section in sections:
-            if section.startswith('SUMMARY:'):
-                current_section = "summary"
-                result["summary"] = section.replace('SUMMARY:', '').strip()
-            elif section.startswith('OPTIMIZED_RESUME:'):
-                current_section = "optimized_resume"
-                result["optimized_resume"] = section.replace('OPTIMIZED_RESUME:', '').strip()
-            elif section.startswith('CHANGES_MADE:'):
-                current_section = "changes"
-                changes = section.replace('CHANGES_MADE:', '').strip().split('\n')
-                result["changes"] = [change.strip('- ') for change in changes if change.strip()]
-            elif current_section:
-                if current_section == "changes":
-                    result["changes"].extend([change.strip('- ') for change in section.split('\n') if change.strip()])
-                else:
-                    result[current_section] += '\n' + section.strip()
-
-        return result

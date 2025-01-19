@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Resume, getResumeDownloadUrl } from '../services/api';
+import { Resume, deleteResume } from '../services/api';
 import AnalysisModal from './AnalysisModal';
-import { supabase } from '../lib/supabaseClient'; // Fixed import path
+import ConfirmModal from './ConfirmModal';
+import { Download, FileText, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ResumeCardProps {
   resume: Resume;
@@ -9,118 +11,149 @@ interface ResumeCardProps {
 }
 
 export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
-  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async () => {
-    if (!resume.optimized_pdf_url || isDownloading) return;
-    
     try {
       setIsDownloading(true);
-      console.log('Starting download for URL:', resume.optimized_pdf_url);
-      
-      // Get the PDF directly from the optimized_pdf_url
-      const response = await fetch(resume.optimized_pdf_url);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Download response error:', errorText);
-        throw new Error(`Failed to download file: ${response.statusText}`);
+      if (resume.optimized_pdf_url) {
+        window.open(resume.optimized_pdf_url, '_blank');
       }
-
-      // Check content type
-      const contentType = response.headers.get('content-type');
-      console.log('Response content type:', contentType);
-
-      // Get the file as a blob
-      const blob = await response.blob();
-      if (blob.size === 0) {
-        throw new Error('Downloaded file is empty');
-      }
-
-      console.log('Downloaded blob:', {
-        size: blob.size,
-        type: blob.type
-      });
-
-      // Create object URL and trigger download
-      const downloadUrl = window.URL.createObjectURL(
-        new Blob([blob], { type: 'application/pdf' })
-      );
-      
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = resume.title.endsWith('.pdf') ? resume.title : `${resume.title}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up
-      setTimeout(() => {
-        window.URL.revokeObjectURL(downloadUrl);
-      }, 100);
-      
-      console.log('Download completed successfully');
     } catch (error) {
       console.error('Error downloading resume:', error);
-      alert('Failed to download resume. Please try again.');
+      setError('Failed to download resume');
     } finally {
       setIsDownloading(false);
     }
   };
 
+  const handleViewAnalysis = () => {
+    console.log('[DEBUG] Opening analysis modal with data:', resume.analysis);
+    setIsAnalysisOpen(true);
+  };
+
+  const handleDelete = async () => {
+    try {
+      console.log('Starting delete process for resume:', resume.id);
+      setIsDeleting(true);
+      setError(null);
+      
+      await deleteResume(resume.id);
+      console.log('Resume deleted successfully, calling onUpdate');
+      
+      // Close the modal and refresh the list
+      setShowDeleteConfirm(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Error in handleDelete:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete resume');
+    } finally {
+      console.log('Delete process finished');
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <svg className="h-8 w-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-              <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <div>
-            <h3 className="text-lg font-medium text-gray-900">{resume.title}</h3>
-            <p className="text-sm text-gray-500">
-              Created {formatDate(resume.created_at)}
-            </p>
-          </div>
+    <div className="bg-white rounded-lg shadow-md p-6 mb-4 relative">
+      {/* Loading overlay */}
+      {(isDeleting || isDownloading) && (
+        <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
         </div>
-        <div className="flex items-center space-x-2">
-          {resume.analysis && (
-            <button
-              onClick={() => setIsAnalysisOpen(true)}
-              className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              View Analysis
-            </button>
-          )}
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div className="absolute top-0 left-0 right-0 p-4 bg-red-100 text-red-700 rounded-t-lg">
+          {error}
+          <button 
+            onClick={() => setError(null)}
+            className="float-right text-red-700 hover:text-red-900"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">{resume.title}</h3>
+          <p className="text-sm text-gray-600">
+            Created {format(new Date(resume.created_at), 'PPP')}
+          </p>
+        </div>
+        <div className="flex space-x-2">
           {resume.optimized_pdf_url && (
             <button
               onClick={handleDownload}
-              disabled={isDownloading}
-              className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isDownloading || isDeleting}
+              className="p-2 text-gray-600 hover:text-indigo-600 transition-colors disabled:opacity-50"
+              title="Download PDF"
             >
-              {isDownloading ? 'Downloading...' : 'Download'}
+              <Download className="w-5 h-5" />
             </button>
           )}
+          {resume.analysis && (
+            <button
+              onClick={handleViewAnalysis}
+              disabled={isDeleting}
+              className="p-2 text-gray-600 hover:text-indigo-600 transition-colors disabled:opacity-50"
+              title="View Analysis"
+            >
+              <FileText className="w-5 h-5" />
+            </button>
+          )}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isDeleting || isDownloading}
+            className="p-2 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50"
+            title="Delete Resume"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
         </div>
       </div>
+
+      {resume.job_url && (
+        <a
+          href={resume.job_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-indigo-600 hover:text-indigo-800"
+        >
+          View Job Posting
+        </a>
+      )}
+
+      {resume.status === 'processing' && (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          Processing
+        </span>
+      )}
+      {resume.status === 'failed' && (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          Failed
+        </span>
+      )}
 
       <AnalysisModal
         isOpen={isAnalysisOpen}
         onClose={() => setIsAnalysisOpen(false)}
         analysis={resume.analysis || ''}
+      />
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Resume"
+        message="Are you sure you want to delete this resume? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </div>
   );

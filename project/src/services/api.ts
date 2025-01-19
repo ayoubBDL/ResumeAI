@@ -57,8 +57,30 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
       throw new Error('Failed to optimize resume');
     }
 
-    // Get the PDF blob from the response
-    const pdfBlob = await response.blob();
+    // Check content type
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      console.error('Unexpected content type:', contentType);
+      throw new Error('Server returned invalid response format');
+    }
+
+    // Get the response data
+    let responseData;
+    try {
+      responseData = await response.json();
+      console.log('[DEBUG] Response data:', responseData);
+    } catch (error) {
+      console.error('Error parsing response:', error);
+      throw new Error('Failed to parse server response');
+    }
+
+    if (!responseData.success || !responseData.pdf_data || !responseData.analysis) {
+      console.error('Invalid response data:', responseData);
+      throw new Error('Server returned incomplete data');
+    }
+
+    // Convert base64 PDF to blob
+    const pdfBlob = base64ToBlob(responseData.pdf_data, 'application/pdf');
     if (pdfBlob.size === 0) {
       throw new Error('Received empty PDF from server');
     }
@@ -112,6 +134,7 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
         title: safeFileName,
         job_url: formData.get('job_url'),
         optimized_pdf_url: data.signedUrl,
+        analysis: responseData.analysis,  // Store the analysis from the response
         status: 'completed'
       })
       .select()
@@ -268,4 +291,41 @@ export const updateJobApplicationStatus = async (jobId: string, status: JobAppli
 
   if (error) throw error;
   return data;
+};
+
+// Delete resume
+export async function deleteResume(id: string): Promise<void> {
+  console.log('Starting delete operation for resume:', id);
+  
+  // First check if the resume exists
+  const { data: resume, error: fetchError } = await supabase
+    .from('resumes')
+    .select()
+    .eq('id', id)
+    .single();
+
+  if (fetchError) {
+    console.error('Error fetching resume:', fetchError);
+    throw fetchError;
+  }
+
+  if (!resume) {
+    console.error('Resume not found:', id);
+    throw new Error('Resume not found');
+  }
+
+  console.log('Found resume:', resume);
+
+  // Delete the resume
+  const { error: deleteError } = await supabase
+    .from('resumes')
+    .delete()
+    .eq('id', id);
+
+  if (deleteError) {
+    console.error('Error deleting resume:', deleteError);
+    throw deleteError;
+  }
+
+  console.log('Successfully deleted resume:', id);
 };
