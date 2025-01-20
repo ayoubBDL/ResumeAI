@@ -791,6 +791,61 @@ def download_resume(resume_id):
             "error": str(e)
         }), 500
 
+@app.route('/api/resumes/<resume_id>', methods=['DELETE', 'OPTIONS'])
+def delete_resume(resume_id):
+    """Endpoint to delete a resume"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'DELETE,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        # First get the resume to check ownership and get the file path
+        response = supabase.table('resumes')\
+            .select('optimized_pdf_url')\
+            .eq('id', resume_id)\
+            .eq('user_id', user_id)\
+            .execute()
+
+        if not response.data:
+            return jsonify({"error": "Resume not found or not authorized"}), 404
+
+        optimized_pdf_url = response.data[0].get('optimized_pdf_url')
+        if optimized_pdf_url:
+            # Extract the file path from the URL
+            try:
+                file_path = optimized_pdf_url.split('/resumes/')[1].split('?')[0]
+                # Delete the file from storage
+                supabase.storage.from_('resumes').remove([file_path])
+            except Exception as e:
+                print(f"Warning: Failed to delete file from storage: {str(e)}")
+
+        # Delete the database record
+        supabase.table('resumes')\
+            .delete()\
+            .eq('id', resume_id)\
+            .eq('user_id', user_id)\
+            .execute()
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # Remove the delete endpoint since we're handling it in the frontend
@@ -831,6 +886,7 @@ def main():
     print("\nAvailable Endpoints:")
     print("- GET / - API information")
     print("- GET /health - Health check")
+    print("- POST /get-job-details - Get job details from LinkedIn")
     print("- POST /optimize - Optimize resume")
     print("- GET /api/resumes - Get user's resumes")
     print("- GET /api/resumes/<id>/download - Download resume")

@@ -119,8 +119,8 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{resume.title}</h3>
-          <p className="text-sm text-gray-600">
-            Created {format(new Date(resume.created_at), 'PPP')}
+          <p className="text-sm text-gray-500">
+            Created on {format(new Date(resume.created_at), 'MMM d, yyyy h:mm a')}
           </p>
         </div>
         <div className="flex space-x-2">
