@@ -46,7 +46,7 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
     }
 
     // Call the optimization endpoint first
-    const response = await fetch(`${API_URL}/optimize`, {
+    const response = await fetch(`/api/optimize`, {
       method: 'POST',
       body: formData,
     });
@@ -152,28 +152,87 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
   }
 };
 
-// Helper function to download a file from Supabase Storage
-export const getResumeDownloadUrl = async (filePath: string): Promise<string> => {
+// Get recent resumes
+export async function getRecentResumes(): Promise<Resume[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`/api/resumes`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': session.user.id
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to get resumes');
+  }
+
+  return response.json();
+}
+
+// Delete resume
+export async function deleteResume(id: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`/api/resumes/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': session.user.id
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete resume');
+  }
+}
+
+// Get resume download URL
+export const getResumeDownloadUrl = async (resumeId: string) => {
   try {
-    // Get the current user and session
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
-      throw new Error('User not authenticated');
+      throw new Error('Not authenticated');
     }
 
-    // Get the signed URL with an expiry of 60 minutes
-    const { data, error } = await supabase.storage
-      .from('public')
-      .createSignedUrl(filePath, 60 * 60);
+    const response = await fetch(`/api/resumes/${resumeId}/download`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': session.user.id
+      }
+    });
 
-    if (error || !data?.signedUrl) {
-      console.error('Error generating signed URL:', error);
-      throw new Error('Failed to generate download URL');
+    if (!response.ok) {
+      throw new Error('Failed to download resume');
     }
 
-    return data.signedUrl;
+    // Create blob from response
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    // Create and click download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${resumeId}_resume.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   } catch (error) {
-    console.error('Error in getResumeDownloadUrl:', error);
+    console.error('Error downloading resume:', error);
     throw error;
   }
 };
@@ -197,49 +256,6 @@ function base64ToBlob(base64: string, type: string): Blob {
 
   return new Blob(byteArrays, { type });
 }
-
-export const getRecentResumes = async (): Promise<Resume[]> => {
-  try {
-    // Get the current user and session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('No active session');
-    }
-
-    // Get user from session
-    const user = session.user;
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-
-    // Use explicit query parameters
-    const { data, error } = await supabase
-      .from('resumes')
-      .select(`
-        id,
-        user_id,
-        title,
-        created_at,
-        optimized_pdf_url,
-        analysis,
-        job_url,
-        status
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (error) {
-      console.error('Error fetching resumes:', error);
-      throw error;
-    }
-
-    return (data || []) as Resume[];
-  } catch (error) {
-    console.error('Error in getRecentResumes:', error);
-    throw error;
-  }
-};
 
 // Supabase database operations
 export const saveJobApplication = async (
@@ -291,41 +307,4 @@ export const updateJobApplicationStatus = async (jobId: string, status: JobAppli
 
   if (error) throw error;
   return data;
-};
-
-// Delete resume
-export async function deleteResume(id: string): Promise<void> {
-  console.log('Starting delete operation for resume:', id);
-  
-  // First check if the resume exists
-  const { data: resume, error: fetchError } = await supabase
-    .from('resumes')
-    .select()
-    .eq('id', id)
-    .single();
-
-  if (fetchError) {
-    console.error('Error fetching resume:', fetchError);
-    throw fetchError;
-  }
-
-  if (!resume) {
-    console.error('Resume not found:', id);
-    throw new Error('Resume not found');
-  }
-
-  console.log('Found resume:', resume);
-
-  // Delete the resume
-  const { error: deleteError } = await supabase
-    .from('resumes')
-    .delete()
-    .eq('id', id);
-
-  if (deleteError) {
-    console.error('Error deleting resume:', deleteError);
-    throw deleteError;
-  }
-
-  console.log('Successfully deleted resume:', id);
 };

@@ -20,12 +20,49 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
   const handleDownload = async () => {
     try {
       setIsDownloading(true);
-      if (resume.optimized_pdf_url) {
-        window.open(resume.optimized_pdf_url, '_blank');
+      setError(null);
+      
+      // Get the signed URL from the backend
+      const response = await fetch(`/api/resumes/${resume.id}/download`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': resume.user_id
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get download URL');
       }
+
+      const data = await response.json();
+      if (!data.success || !data.url) {
+        throw new Error(data.error || 'Failed to get download URL');
+      }
+
+      // Fetch the actual PDF content
+      const pdfResponse = await fetch(data.url);
+      if (!pdfResponse.ok) {
+        throw new Error('Failed to download PDF');
+      }
+
+      const pdfBlob = await pdfResponse.blob();
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+
+      // Create a temporary link element to trigger download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `${resume.job_title || 'resume'}.pdf`);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Error downloading resume:', error);
-      setError('Failed to download resume');
+      setError(error instanceof Error ? error.message : 'Failed to download resume');
     } finally {
       setIsDownloading(false);
     }

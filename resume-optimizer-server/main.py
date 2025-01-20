@@ -1,14 +1,15 @@
 from dotenv import load_dotenv
 import os
-from openai import OpenAI
+import openai
 import requests
 import json
 import io
 import base64
 import pdfplumber
-from flask import Flask, request, jsonify, send_file, make_response
+from flask import Flask, request, jsonify, make_response, send_file
 from flask_cors import CORS
 from services.linkedin_batch_scraper import LinkedInJobScraper
+from services.supabase_client import supabase
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -22,11 +23,24 @@ import time
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
 if not api_key:
-    raise ValueError("OPENAI_API_KEY not found in environment variables")
-client = OpenAI(api_key=api_key)
+    raise ValueError("OpenAI API key not found in environment variables")
+openai.api_key = api_key
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, resources={
+    r"/*": {  # Allow all routes
+        "origins": ["http://localhost:5173"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "Authorization"]
+    }
+})  # Enable CORS for all routes with specific configuration
+
+# Enable hot reloading
+app.config['DEBUG'] = True
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.jinja_env.auto_reload = True
 
 def clean_text(text):
     """Clean extracted text by removing extra spaces and formatting"""
@@ -86,7 +100,7 @@ def generate_with_openai(prompt):
     try:
         print("[OpenAI] Sending request to OpenAI API...")
         
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4o-mini",  # Using the original model
             messages=[
                 {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
@@ -606,8 +620,8 @@ def optimize_resume():
         """
 
         print("[Optimize] Sending request to AI model...")
-        response = client.chat.completions.create(
-            model="gpt-4",
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",  # Using the original model
             messages=[
                 {"role": "system", "content": "You are an expert ATS optimization and career advisor. Provide detailed, specific advice for both resume optimization and interview preparation."},
                 {"role": "user", "content": prompt}
@@ -680,6 +694,103 @@ def optimize_resume():
             except Exception as e:
                 print(f"[Optimize WARNING] Failed to clean up temp file: {str(e)}")
 
+@app.route('/api/resumes', methods=['GET', 'OPTIONS'])
+def get_resumes():
+    """Endpoint to get all resumes"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        # Fetch resumes from Supabase
+        response = supabase.table('resumes')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .order('created_at', desc=True)\
+            .execute()
+
+        if not response.data:
+            return jsonify([])  # Return empty list if no resumes found
+
+        return jsonify(response.data)
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/resumes/<resume_id>/download', methods=['GET', 'OPTIONS'])
+def download_resume(resume_id):
+    """Endpoint to get a signed URL for downloading a resume PDF"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        # First verify the resume belongs to the user and get the PDF URL
+        response = supabase.table('resumes')\
+            .select('optimized_pdf_url')\
+            .eq('id', resume_id)\
+            .eq('user_id', user_id)\
+            .execute()
+
+        if not response.data:
+            return jsonify({"error": "Resume not found or not authorized"}), 404
+
+        optimized_pdf_url = response.data[0].get('optimized_pdf_url')
+        if not optimized_pdf_url:
+            return jsonify({"error": "Resume file not found"}), 404
+
+        # Extract the file path from the stored URL
+        # URL format: https://<project>.supabase.co/storage/v1/object/sign/resumes/<filename>?token=...
+        try:
+            file_path = optimized_pdf_url.split('/resumes/')[1].split('?')[0]
+        except:
+            return jsonify({"error": "Invalid file URL format"}), 500
+
+        # Generate a fresh signed URL
+        signed_url_response = supabase.storage\
+            .from_('resumes')\
+            .create_signed_url(f"{file_path}", 300)  # URL valid for 5 minutes
+
+        if not signed_url_response or 'signedURL' not in signed_url_response:
+            return jsonify({"error": "Failed to generate download URL"}), 500
+
+        return jsonify({
+            "success": True,
+            "url": signed_url_response['signedURL']
+        })
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     # Remove the delete endpoint since we're handling it in the frontend
@@ -709,36 +820,30 @@ def main():
     # Configuration
     host = os.getenv('HOST', 'localhost')
     port = int(os.getenv('PORT', 5050))
-    debug = os.getenv('DEBUG', 'True').lower() == 'true'
+    debug = True  # Force debug mode for hot reloading
     
     print(f"\nServer Configuration:")
     print(f"- Host: {host}")
     print(f"- Port: {port}")
     print(f"- Debug Mode: {debug}")
+    print(f"- Hot Reloading: Enabled")
     
     print("\nAvailable Endpoints:")
     print("- GET / - API information")
     print("- GET /health - Health check")
-    print("- POST /get-job-details - Get job details from LinkedIn")
-    print("- POST /optimize - Optimize resume for job")
-    print("- POST /scrape-jobs - Scrape jobs from LinkedIn")
-    print("- POST /scrape-job-url - Scrape job by URL")
-    print("- POST /search-similar-jobs - Search for similar jobs")
+    print("- POST /optimize - Optimize resume")
+    print("- GET /api/resumes - Get user's resumes")
+    print("- GET /api/resumes/<id>/download - Download resume")
+    print("- DELETE /api/resumes/<id> - Delete resume")
     
-    print(f"\nServer running at http://{host}:{port}")
-    
-    try:
-        app.run(host=host, port=port, debug=debug)
-    except Exception as e:
-        print(f"\nError starting server: {str(e)}")
-        return
+    # Run the application with hot reloading
+    app.run(
+        host=host,
+        port=port,
+        debug=True,
+        use_reloader=True,
+        threaded=True
+    )
 
 if __name__ == '__main__':
-    print("Starting Resume Optimizer Server...")
-    print("Available endpoints:")
-    print("  POST /get-job-details - Get job details from LinkedIn")
-    print("  POST /optimize - Optimize resume")
-    print("  POST /scrape-jobs - Scrape jobs from LinkedIn")
-    print("  POST /scrape-job-url - Scrape job by URL")
-    print("  POST /search-similar-jobs - Search for similar jobs")
-    app.run(host='localhost', port=5050)
+    main()
