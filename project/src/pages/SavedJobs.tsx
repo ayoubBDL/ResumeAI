@@ -1,122 +1,185 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { getJobApplications, updateJobApplicationStatus, JobApplication } from '../services/api';
+import { getJobApplications, JobApplication, getResumeDownloadUrl } from '../services/api';
+import { format } from 'date-fns';
+import { Building2, Calendar, ExternalLink, Search, BookOpen, Download } from 'lucide-react';
+import AnalysisModal from '../components/AnalysisModal';
 
 export default function SavedJobs() {
-  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<JobApplication[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
+  const [selectedAnalysis, setSelectedAnalysis] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
 
   useEffect(() => {
-    loadJobs();
-  }, [user]);
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
-  const loadJobs = async () => {
-    try {
-      if (user) {
-        const data = await getJobApplications(user.id);
-        setJobs(data);
+    const fetchJobs = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setIsLoading(true);
+        setError(null);
+        const jobsData = await getJobApplications(user.id);
+        if (isMounted) {
+          setJobs(jobsData);
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Error fetching jobs:', err);
+          setError(err instanceof Error ? err.message : 'Failed to fetch jobs');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error loading jobs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  const handleStatusChange = async (jobId: string, newStatus: JobApplication['status']) => {
+    // Debounce the fetch call
+    timeoutId = setTimeout(fetchJobs, 100);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [user?.id]);
+
+  const handleDownload = async (resumeId: string, jobTitle: string, userId: string) => {
     try {
-      await updateJobApplicationStatus(jobId, newStatus);
-      await loadJobs(); // Reload to get updated data
+      setIsDownloading(true);
+      await downloadResume(resumeId, jobTitle);
     } catch (error) {
-      console.error('Error updating job status:', error);
+      console.error('Error downloading resume:', error);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
-  if (loading) {
-    return <div>Loading...</div>;
+  const filteredJobs = jobs.filter((job) => {
+    if (!searchTerm) return true;
+    return job.job_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      job.job_description?.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      </Layout>
+    );
   }
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-3xl font-bold mb-8">Saved Jobs</h1>
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-semibold text-gray-900">Saved Jobs</h1>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search jobs..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-64 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+            </div>
+          </div>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Job Title
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Company
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Applied Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {jobs.map((job) => (
-                <tr key={job.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{job.job_title}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{job.company}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={job.status}
-                      onChange={(e) => handleStatusChange(job.id, e.target.value as JobApplication['status'])}
-                      className="text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="applied">Applied</option>
-                      <option value="interviewing">Interviewing</option>
-                      <option value="offered">Offered</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {new Date(job.created_at).toLocaleDateString()}
+          {error && (
+            <div className="mb-4 p-4 text-red-700 bg-red-100 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul className="divide-y divide-gray-200">
+              {filteredJobs.map((job) => (
+                <li key={job.id} className="px-6 py-4 hover:bg-gray-50">
+                  <div className="space-y-3">
+                    {/* Title and Company */}
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">{job.job_title}</h3>
+                        <p className="text-sm text-gray-600">{job.company}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-sm rounded-full ${
+                        job.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        job.status === 'applied' ? 'bg-blue-100 text-blue-800' :
+                        job.status === 'interviewing' ? 'bg-purple-100 text-purple-800' :
+                        job.status === 'offered' ? 'bg-green-100 text-green-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                      </span>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <a
-                      href={job.job_url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-600 hover:text-indigo-900 mr-4"
-                    >
-                      View Job
-                    </a>
-                    {job.resume_id && (
-                      <a
-                        href={`/api/resumes/${job.resume_id}/download`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        View Resume
-                      </a>
+
+                    {/* Description */}
+                    {job.job_description && (
+                      <div className="text-sm text-gray-600 line-clamp-3">
+                        {job.job_description}
+                      </div>
                     )}
-                  </td>
-                </tr>
+
+                    {/* Links */}
+                    <div className="flex flex-wrap gap-4">
+                      {job.job_url && (
+                        <a
+                          href={job.job_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          View Job Post <ExternalLink className="ml-2 -mr-0.5 h-4 w-4" />
+                        </a>
+                      )}
+                      {job.resume?.analysis && (
+                        <button
+                          onClick={() => {
+                            console.log('Opening analysis for job:', job);
+                            setSelectedAnalysis(job.resume?.analysis || '');
+                            setIsAnalysisOpen(true);
+                          }}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          Advice <BookOpen className="ml-2 -mr-0.5 h-4 w-4" />
+                        </button>
+                      )}
+                      {job.resume_id && (
+                        <button
+                          onClick={() => handleDownload(job.resume_id!, job.job_title, user?.id || '')}
+                          disabled={isDownloading}
+                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isDownloading ? 'Downloading...' : 'Download Resume'} <Download className="ml-2 -mr-0.5 h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+          </div>
         </div>
       </div>
+
+      {/* Analysis Modal */}
+      <AnalysisModal
+        isOpen={isAnalysisOpen}
+        onClose={() => setIsAnalysisOpen(false)}
+        analysis={selectedAnalysis}
+      />
     </Layout>
   );
 }

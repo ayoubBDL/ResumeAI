@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const API_URL = import.meta.env.VITE_RESUME_API_URL;
+const API_URL = import.meta.env.VITE_RESUME_API_URL || 'http://localhost:5000';
 const JOB_API_URL = import.meta.env.VITE_JOB_API_URL;
 
 export interface JobApplication {
@@ -14,6 +14,8 @@ export interface JobApplication {
   status: 'pending' | 'applied' | 'interviewing' | 'offered' | 'rejected';
   created_at: string;
   updated_at: string;
+  analysis: string | null;
+  resume: Resume | null;
 }
 
 export interface Resume {
@@ -46,9 +48,13 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
     }
 
     // Call the optimization endpoint first
-    const response = await fetch(`/api/optimize`, {
+    const response = await fetch(`${API_URL}/optimize`, {
       method: 'POST',
       body: formData,
+      credentials: 'include',
+      headers: {
+        'X-User-Id': session.user.id
+      }
     });
 
     if (!response.ok) {
@@ -126,7 +132,7 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
       url: data.signedUrl
     });
 
-    // Create database record
+    // Create database record for resume
     const { data: resumeRecord, error: createError } = await supabase
       .from('resumes')
       .insert({
@@ -134,7 +140,7 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
         title: safeFileName,
         job_url: formData.get('job_url'),
         optimized_pdf_url: data.signedUrl,
-        analysis: responseData.analysis,  // Store the analysis from the response
+        analysis: responseData.analysis,
         status: 'completed'
       })
       .select()
@@ -145,6 +151,36 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
       throw createError;
     }
 
+    // Get job details from the form data
+    const jobUrl = formData.get('job_url') as string;
+    const jobTitle = formData.get('job_title') as string;
+    const company = formData.get('company') as string;
+    const jobDescription = formData.get('job_description') as string;
+
+    // Save the job application
+    if (jobUrl && jobTitle && company) {
+      try {
+        const { data: jobRecord } = await supabase
+          .from('job_applications')
+          .insert({
+            user_id: session.user.id,
+            resume_id: resumeRecord.id, // Link the resume to the job
+            job_title: jobTitle,
+            company: company,
+            job_description: jobDescription,
+            job_url: jobUrl,
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        console.log('Job saved successfully:', jobRecord);
+      } catch (error) {
+        // Don't fail the whole process if job saving fails
+        console.error('Error saving job:', error);
+      }
+    }
+
     return resumeRecord;
   } catch (error) {
     console.error('Error in optimizeResume:', error);
@@ -153,15 +189,19 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
 };
 
 // Get recent resumes
-export async function getRecentResumes(): Promise<Resume[]> {
+export const getRecentResumes = async (limit?: number): Promise<Resume[]> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) {
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`/api/resumes`, {
+  const url = new URL(`${API_URL}/api/resumes`);
+  if (limit) {
+    url.searchParams.append('limit', limit.toString());
+  }
+
+  const response = await fetch(url.toString(), {
     method: 'GET',
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'X-User-Id': session.user.id
@@ -173,8 +213,8 @@ export async function getRecentResumes(): Promise<Resume[]> {
     throw new Error(error.error || 'Failed to get resumes');
   }
 
-  return response.json();
-}
+  return await response.json();
+};
 
 // Delete resume
 export async function deleteResume(id: string): Promise<void> {
@@ -198,13 +238,14 @@ export async function deleteResume(id: string): Promise<void> {
 }
 
 // Get resume download URL
-export const getResumeDownloadUrl = async (resumeId: string) => {
+export const getResumeDownloadUrl = async (resumeId: string, jobTitle?: string) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       throw new Error('Not authenticated');
     }
 
+    // First get the signed URL
     const response = await fetch(`/api/resumes/${resumeId}/download`, {
       method: 'GET',
       headers: {
@@ -214,22 +255,32 @@ export const getResumeDownloadUrl = async (resumeId: string) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to download resume');
+      throw new Error('Failed to get download URL');
     }
 
-    // Create blob from response
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    const data = await response.json();
+    if (!data.success || !data.url) {
+      throw new Error(data.error || 'Failed to get download URL');
+    }
+
+    // Now fetch the actual PDF using the signed URL
+    const pdfResponse = await fetch(data.url);
+    if (!pdfResponse.ok) {
+      throw new Error('Failed to download PDF');
+    }
+
+    const pdfBlob = await pdfResponse.blob();
+    const blobUrl = window.URL.createObjectURL(pdfBlob);
     
     // Create and click download link
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${resumeId}_resume.pdf`;
+    a.href = blobUrl;
+    a.download = `${jobTitle || 'resume'}.pdf`;
     document.body.appendChild(a);
     a.click();
     
     // Cleanup
-    window.URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(blobUrl);
     document.body.removeChild(a);
   } catch (error) {
     console.error('Error downloading resume:', error);
@@ -287,24 +338,74 @@ export const saveJobApplication = async (
 };
 
 export const getJobApplications = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('job_applications')
-    .select('*, resumes(*)')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  const response = await fetch(`${API_URL}/api/jobs`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': userId
+    }
+  });
 
-  if (error) throw error;
-  return data;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to get job applications');
+  }
+
+  return await response.json();
+};
+
+export const saveJob = async (
+  jobTitle: string,
+  company: string,
+  jobDescription: string,
+  jobUrl: string
+): Promise<JobApplication> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${API_URL}/api/jobs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': session.user.id
+    },
+    body: JSON.stringify({
+      job_title: jobTitle,
+      company,
+      job_description: jobDescription,
+      job_url: jobUrl
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to save job');
+  }
+
+  return await response.json();
 };
 
 export const updateJobApplicationStatus = async (jobId: string, status: JobApplication['status']) => {
-  const { data, error } = await supabase
-    .from('job_applications')
-    .update({ status })
-    .eq('id', jobId)
-    .select()
-    .single();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
+  }
 
-  if (error) throw error;
-  return data;
+  const response = await fetch(`${API_URL}/api/jobs/${jobId}/status`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': session.user.id
+    },
+    body: JSON.stringify({ status })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update job status');
+  }
+
+  return await response.json();
 };

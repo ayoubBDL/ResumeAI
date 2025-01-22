@@ -11,9 +11,9 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
 
   // Parse the analysis sections
   const sections = {
-    improvements: analysis.split('1. KEY IMPROVEMENTS MADE:')[1]?.split('2. INTERVIEW PREPARATION ADVICE:')[0]?.trim() || '',
-    interview: analysis.split('2. INTERVIEW PREPARATION ADVICE:')[1]?.split('3. NEXT STEPS:')[0]?.trim() || '',
-    nextSteps: analysis.split('3. NEXT STEPS:')[1]?.trim() || ''
+    improvements: analysis.match(/\*\*1\.\s*KEY IMPROVEMENTS MADE:\*\*\s*([\s\S]*?)(?=\*\*2\.\s*INTERVIEW PREPARATION ADVICE:\*\*)/)?.[1]?.trim(),
+    interview: analysis.match(/\*\*2\.\s*INTERVIEW PREPARATION ADVICE:\*\*\s*([\s\S]*?)(?=\*\*3\.\s*NEXT STEPS:\*\*)/)?.[1]?.trim(),
+    nextSteps: analysis.match(/\*\*3\.\s*NEXT STEPS:\*\*\s*([\s\S]*?)$/)?.[1]?.trim()
   };
 
   const formatBulletPoints = (text: string) => {
@@ -21,8 +21,14 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
     return text
       .split('\n')
       .map(line => line.trim())
-      .filter(line => line && line.startsWith('•'))
-      .map(line => line.replace(/^•\s*/, '').trim());
+      .filter(line => line.length > 0 && !line.startsWith('='))
+      .map(line => {
+        // Remove bullet points and dashes
+        line = line.replace(/^\s*[•\-]\s*/, '');
+        // Format bold text
+        line = line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        return line;
+      });
   };
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -33,11 +39,9 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
 
   return (
     <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex" onClick={handleBackdropClick}>
-      <div className="relative p-8 bg-white w-full max-w-3xl m-auto rounded-lg max-h-[90vh] overflow-y-auto">
+      <div className="relative p-8 bg-white w-full max-w-4xl m-auto rounded-lg max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Resume Analysis
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900">Resume Analysis</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -55,7 +59,7 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
             <div className="p-4">
               <ul className="list-disc pl-5 space-y-2">
                 {formatBulletPoints(sections.improvements).map((point, index) => (
-                  <li key={index} className="text-gray-700">{point}</li>
+                  <li key={index} className="text-gray-700" dangerouslySetInnerHTML={{ __html: point }} />
                 ))}
               </ul>
             </div>
@@ -69,7 +73,7 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
             <div className="p-4">
               <ul className="list-disc pl-5 space-y-2">
                 {formatBulletPoints(sections.interview).map((point, index) => (
-                  <li key={index} className="text-gray-700">{point}</li>
+                  <li key={index} className="text-gray-700" dangerouslySetInnerHTML={{ __html: point }} />
                 ))}
               </ul>
             </div>
@@ -83,7 +87,7 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
             <div className="p-4">
               <ul className="list-disc pl-5 space-y-2">
                 {formatBulletPoints(sections.nextSteps).map((point, index) => (
-                  <li key={index} className="text-gray-700">{point}</li>
+                  <li key={index} className="text-gray-700" dangerouslySetInnerHTML={{ __html: point }} />
                 ))}
               </ul>
             </div>

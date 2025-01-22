@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { optimizeResume, getRecentResumes, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
@@ -9,83 +10,123 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
-  const [progress, setProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadRecentResumes();
+    let isMounted = true;
+
+    const fetchRecentResumes = async () => {
+      try {
+        setIsLoading(true);
+        const resumes = await getRecentResumes(3); // Get only last 3 resumes
+        if (isMounted) {
+          setRecentResumes(resumes);
+        }
+      } catch (error) {
+        console.error('Error loading resumes:', error);
+        if (isMounted) {
+          setError(error instanceof Error ? error.message : 'Failed to load resumes');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchRecentResumes();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isUploading) {
-      // Simulate progress for better UX
-      setProgress(0);
-      interval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) return prev; // Cap at 90% until complete
-          return prev + Math.random() * 15;
-        });
-      }, 500);
-    } else {
-      setProgress(100);
-    }
+    if (!isUploading) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const resumes = await getRecentResumes(3);
+        setRecentResumes(resumes);
+        
+        // Check if the most recent resume is completed
+        const latestResume = resumes[0];
+        if (latestResume && latestResume.status === 'completed') {
+          setIsUploading(false);
+          setUploadStatus('Resume optimized successfully!');
+          // Clear the form
+          resetForm();
+        } else if (latestResume && latestResume.status === 'failed') {
+          setIsUploading(false);
+          setUploadStatus('Failed to optimize resume. Please try again.');
+          resetForm();
+        }
+      } catch (error) {
+        console.error('Error checking resume status:', error);
+        setUploadStatus('Error checking resume status');
+        setIsUploading(false);
+      }
+    }, 2000);
+
     return () => clearInterval(interval);
   }, [isUploading]);
-
-  const loadRecentResumes = async () => {
-    try {
-      const resumes = await getRecentResumes();
-      setRecentResumes(resumes);
-    } catch (error) {
-      console.error('Error loading resumes:', error);
-      setUploadStatus('Failed to load recent resumes');
-    }
-  };
 
   const resetForm = () => {
     setFile(null);
     setJobUrl('');
-    setUploadStatus('');
-    setProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file || isUploading) return;
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setFile(file);
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    if (!file) {
+      setUploadStatus('Please select a file');
+      return;
+    }
 
     try {
       setIsUploading(true);
-      setUploadStatus('');  // Clear any previous status
+      setUploadStatus('Optimizing your resume...');
 
       const formData = new FormData();
-      formData.append('resume', file);
+      formData.append('file', file);
       if (jobUrl) {
         formData.append('job_url', jobUrl);
       }
 
-      const resume = await optimizeResume(formData);
-      resetForm();
+      await optimizeResume(formData);
       
-      // Refresh the list of resumes
-      loadRecentResumes();
+      // The status will be updated by the interval effect
     } catch (error) {
-      console.error('Error optimizing resume:', error);
-      setUploadStatus(error instanceof Error ? error.message : 'Failed to optimize resume');
-    } finally {
+      console.error('Error uploading resume:', error);
+      setUploadStatus('Failed to upload resume');
       setIsUploading(false);
     }
   };
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h1 className="text-2xl font-bold mb-6">Resume Optimizer</h1>
-          
+      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold text-gray-900">Upload Resume</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Upload your resume and we'll optimize it for your target job
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -159,7 +200,7 @@ export default function Dashboard() {
 
             <div>
               <label htmlFor="job-url" className="block text-sm font-medium text-gray-700">
-                LinkedIn Job URL (Optional)
+                Job Posting URL (optional)
               </label>
               <div className="mt-1">
                 <input
@@ -169,7 +210,7 @@ export default function Dashboard() {
                   value={jobUrl}
                   onChange={(e) => setJobUrl(e.target.value)}
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="https://www.linkedin.com/jobs/view/..."
+                  placeholder="https://example.com/job-posting"
                 />
               </div>
             </div>
@@ -178,10 +219,10 @@ export default function Dashboard() {
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div 
                   className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(Math.round(progress), 100)}%` }}
+                  style={{ width: `${Math.min(Math.round(100), 100)}%` }}
                 />
                 <div className="text-xs text-gray-500 mt-1 text-center">
-                  {Math.min(Math.round(progress), 100)}% Complete
+                  {Math.min(Math.round(100), 100)}% Complete
                 </div>
               </div>
             )}
@@ -216,15 +257,45 @@ export default function Dashboard() {
               </div>
             )}
           </form>
-        </div>
 
-        {/* Recent Resumes Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold mb-4">Recent Resumes</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {recentResumes.map((resume) => (
-              <ResumeCard key={resume.id} resume={resume} onUpdate={loadRecentResumes} />
-            ))}
+          {/* Recent Resumes Section */}
+          <div className="mt-12">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-900">Recent Resumes</h2>
+              <Link
+                to="/my-resumes"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+              >
+                View all <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+
+            {isLoading ? (
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+              </div>
+            ) : error ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            ) : recentResumes.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500">No resumes yet. Upload your first resume to get started!</p>
+              </div>
+            ) : (
+              <div className="grid gap-6 mb-8 md:grid-cols-2 lg:grid-cols-3">
+                {recentResumes.map((resume) => (
+                  <ResumeCard 
+                    key={resume.id} 
+                    resume={resume} 
+                    onDelete={async () => {
+                      const resumes = await getRecentResumes(3);
+                      setRecentResumes(resumes);
+                    }} 
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
