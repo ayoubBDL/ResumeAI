@@ -18,7 +18,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowabl
 import re
 import tempfile
 import time
-from bs4 import BeautifulSoup
 
 # Load environment variables
 load_dotenv()
@@ -85,6 +84,7 @@ def extract_text_from_pdf(file_storage):
         final_text = "\n\n".join(text_content).strip()
         
         print(f"[PDF Extraction] Total extracted text length: {len(final_text)} characters")
+        print("[PDF Extraction] Complete extracted text:")
         print("=" * 80)
         print(final_text)
         print("=" * 80)
@@ -359,38 +359,6 @@ def split_ai_response(response):
     
     return resume_text.strip(), analysis_text.strip()
 
-def extract_job_details(job_url):
-    """Extract job details from LinkedIn job URL"""
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(job_url, headers=headers)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Extract job title
-        job_title = soup.find('h1', {'class': 'top-card-layout__title'})
-        job_title = job_title.text.strip() if job_title else ''
-        
-        # Extract company
-        company = soup.find('a', {'class': 'topcard__org-name-link'})
-        company = company.text.strip() if company else ''
-        
-        # Extract job description
-        job_description = soup.find('div', {'class': 'show-more-less-html__markup'})
-        job_description = job_description.text.strip() if job_description else ''
-        
-        return {
-            'job_title': job_title,
-            'company': company,
-            'job_description': job_description
-        }
-    except Exception as e:
-        print(f"Error extracting job details: {e}")
-        return None
-
 @app.route('/')
 def home():
     """Root endpoint providing API information"""
@@ -405,7 +373,11 @@ def home():
             "POST /optimize": "Optimize resume for job posting",
             "POST /scrape-jobs": "Scrape jobs from LinkedIn",
             "POST /scrape-job-url": "Scrape job by URL",
-            "POST /search-similar-jobs": "Search for similar jobs"
+            "POST /search-similar-jobs": "Search for similar jobs",
+            "GET /job/<job_id>": "Get job details by ID",
+            "GET /api/jobs": "Get user's jobs",
+            "POST /api/jobs": "Create new job application",
+            "PUT /api/jobs/<job_id>/status": "Update job application status"
         }
     })
 
@@ -574,11 +546,6 @@ def optimize_resume():
             
         print(f"[Optimize] Job URL received: {job_url}")
         
-        # Extract job details from URL
-        job_details = extract_job_details(job_url)
-        if not job_details:
-            raise Exception("Failed to extract job details")
-
         # Get job details using the LinkedIn scraper
         print("[Optimize] Fetching job details from LinkedIn...")
         scraper = LinkedInJobScraper()
@@ -592,7 +559,7 @@ def optimize_resume():
             }), 404
             
         print("[Optimize] Successfully retrieved job details")
-
+        
         # Extract text from PDF
         print("[Optimize] Starting PDF text extraction...")
         resume_text = extract_text_from_pdf(resume_file)
@@ -654,9 +621,6 @@ def optimize_resume():
         3. Be specific and actionable in recommendations
         4. Focus on the job requirements
         5. Maintain all original experience and dates
-        6. Both PART 1 and PART 2 included with clear separation
-
-        ‼️ IMPORTANT: Show the COMPLETE response with both parts clearly separated.
         """
 
         print("[Optimize] Sending request to AI model...")
@@ -667,96 +631,41 @@ def optimize_resume():
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=4000
+            max_tokens=2500
         )
 
-        # Split the response into resume and analysis parts
-        resume_text, analysis = split_ai_response(response.choices[0].message.content)
-        if not resume_text or not analysis:
-            raise Exception("Failed to parse AI response")
-
-        # Create PDF from optimized resume text
-        print("[Optimize] Creating PDF from optimized resume...")
-        pdf_data = create_pdf_from_text(resume_text)
+        # Extract the response
+        ai_response = response.choices[0].message.content.strip()
         
-        # Get user ID from request headers
-        user_id = request.headers.get('X-User-Id')
-        if not user_id:
-            print("[Optimize ERROR] No user ID provided")
-            return jsonify({
-                "success": False,
-                "error": "User ID is required"
-            }), 400
+        # Split the response into resume and analysis parts using the correct marker
+        parts = ai_response.split("PART 2: DETAILED ANALYSIS")
+        optimized_resume = parts[0].split("PART 1: OPTIMIZED RESUME")[-1].strip() if len(parts) > 0 else ""
+        analysis = parts[1].strip() if len(parts) > 1 else ""
+        
+        print("[DEBUG] Analysis extracted:", analysis)
+        
+        # Create the response object
+        response_data = {
+            "optimized_resume": optimized_resume,
+            "analysis": analysis
+        }
 
-        # Format job title for resume name
-        resume_name = job_details['title'].replace(' ', '_').lower()
-            
-        try:
-            # Save the resume first
-            resume_data = {
-                'user_id': user_id,
-                'title': resume_name,
-                'optimized_pdf_url': None,  # Will be set when PDF is uploaded
-                'analysis': analysis,
-                'job_url': job_url,
-                'status': 'completed',
-                'created_at': 'now()',
-                'updated_at': 'now()'
-            }
-
-            print(f"[Optimize] Saving resume data: {resume_data}")
-            resume_result = supabase.table('resumes').insert(resume_data).execute()
-            print(f"[Optimize] Resume save result: {resume_result}")
-
-            if not resume_result.data:
-                print("[Optimize ERROR] Failed to save resume")
-                raise Exception("Failed to save resume")
-
-            resume_id = resume_result.data[0]['id']
-            print(f"[Optimize] Successfully saved resume with ID: {resume_id}")
-
-            # Now save the job with the resume_id
-            job_data = {
-                'user_id': user_id,
-                'resume_id': resume_id,  # Link to the resume we just created
-                'company': job_details['company'],
-                'job_title': job_details['title'],
-                'job_url': job_url,
-                'job_description': job_details['description'],
-                'status': 'new',
-                'created_at': 'now()',
-                'updated_at': 'now()'
-            }
-                
-            print(f"[Optimize] Inserting job data: {job_data}")
-            result = supabase.table('job_applications').insert(job_data).execute()
-                
-            if not result.data:
-                print("[Optimize ERROR] Failed to save job details")
-                raise Exception("Failed to save job details")
-                    
-            job_id = result.data[0]['id']
-            print(f"[Optimize] Successfully saved job with ID: {job_id}")
-
-        except Exception as e:
-            print(f"[Optimize ERROR] Database error: {str(e)}")
-            return jsonify({
-                "success": False,
-                "error": f"Failed to save data: {str(e)}"
-            }), 500
-
-        # Return the optimized resume and analysis
+        print("[DEBUG] Final response data:", response_data)
+        
+        # Generate PDF from resume text
+        print("[Optimize] Generating optimized resume PDF...")
+        temp_pdf_path = create_pdf_from_text(optimized_resume)
+        
         try:
             # Read the PDF file into memory
-            with open(pdf_data, 'rb') as pdf_file:
+            with open(temp_pdf_path, 'rb') as pdf_file:
                 pdf_data = pdf_file.read()
                 
             # Create JSON response with PDF data and analysis
             response = jsonify({
                 "success": True,
                 "analysis": analysis,
-                "pdf_data": base64.b64encode(pdf_data).decode('utf-8'),
-                "job_details": job_details
+                "pdf_data": base64.b64encode(pdf_data).decode('utf-8')
             })
             
             # Set content type to application/json
@@ -770,8 +679,8 @@ def optimize_resume():
         finally:
             # Clean up the temp file
             try:
-                if os.path.exists(pdf_data):
-                    os.unlink(pdf_data)
+                if os.path.exists(temp_pdf_path):
+                    os.unlink(temp_pdf_path)
             except Exception as e:
                 print(f"[Optimize WARNING] Failed to clean up temp file: {str(e)}")
         
@@ -791,7 +700,7 @@ def optimize_resume():
 
 @app.route('/api/resumes', methods=['GET', 'OPTIONS'])
 def get_resumes():
-    """Get all resumes for a user"""
+    """Endpoint to get all resumes"""
     if request.method == 'OPTIONS':
         response = make_response()
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
@@ -802,8 +711,6 @@ def get_resumes():
 
     try:
         user_id = request.headers.get('X-User-Id')
-        limit = request.args.get('limit', type=int)  # Optional limit parameter
-        
         if not user_id:
             return jsonify({
                 "success": False,
@@ -811,15 +718,11 @@ def get_resumes():
             }), 401
 
         # Fetch resumes from Supabase
-        query = supabase.table('resumes')\
+        response = supabase.table('resumes')\
             .select('*')\
             .eq('user_id', user_id)\
-            .order('created_at', desc=True)  # Order by newest first
-            
-        if limit:
-            query = query.limit(limit)
-            
-        response = query.execute()
+            .order('created_at', desc=True)\
+            .execute()
 
         if not response.data:
             return jsonify([])  # Return empty list if no resumes found
@@ -952,6 +855,56 @@ def upload_file():
     # Remove the delete endpoint since we're handling it in the frontend
     pass
 
+@app.route('/job/<job_id>', methods=['GET', 'OPTIONS'])
+def get_job(job_id):
+    """Endpoint to get job details by ID"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        # Fetch job details from Supabase with associated resume data
+        response = supabase.table('job_applications')\
+            .select('*, resume:resumes(id, analysis, title, created_at)')\
+            .eq('id', job_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
+
+        if not response.data:
+            return jsonify({
+                "success": False,
+                "error": "Job not found or not authorized"
+            }), 404
+
+        # Transform the response to include resume analysis
+        job_data = {**response.data}
+        if job_data.get('resume'):
+            job_data['analysis'] = job_data['resume'].get('analysis')
+
+        return jsonify({
+            "success": True,
+            "data": job_data
+        })
+
+    except Exception as e:
+        print(f"Error getting job details: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 @app.route('/api/jobs', methods=['GET', 'POST', 'OPTIONS'])
 def jobs():
     """Handle jobs endpoints"""
@@ -963,14 +916,173 @@ def jobs():
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
 
-    if request.method == 'GET':
-        return get_jobs()
-    elif request.method == 'POST':
-        return save_job()
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        if request.method == 'GET':
+            # Get jobs from Supabase with resume data
+            response = supabase.table('job_applications')\
+                .select('*, resume:resumes(id, analysis, title, created_at, optimized_pdf_url)')\
+                .eq('user_id', user_id)\
+                .order('created_at', desc=True)\
+                .execute()
+
+            if not response.data:
+                return jsonify([])
+
+            # Transform the response to include resume analysis
+            jobs = []
+            for job in response.data:
+                job_data = {**job}
+                if job.get('resume'):
+                    resume = job['resume']
+                    job_data['analysis'] = resume.get('analysis')
+                    job_data['resume_title'] = resume.get('title')
+                    job_data['resume_id'] = resume.get('id')
+                jobs.append(job_data)
+
+            return jsonify(jobs)
+
+        elif request.method == 'POST':
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    "success": False,
+                    "error": "Missing request body"
+                }), 400
+
+            required_fields = ['job_title', 'company', 'job_description', 'job_url']
+            for field in required_fields:
+                if field not in data:
+                    return jsonify({
+                        "success": False,
+                        "error": f"Missing required field: {field}"
+                    }), 400
+
+            # Get the latest resume for this user
+            resume_response = supabase.table('resumes')\
+                .select('id')\
+                .eq('user_id', user_id)\
+                .order('created_at', desc=True)\
+                .limit(1)\
+                .execute()
+
+            resume_id = resume_response.data[0]['id'] if resume_response.data else None
+
+            # Save job to Supabase
+            job_data = {
+                'user_id': user_id,
+                'job_title': data['job_title'],
+                'company': data['company'],
+                'job_description': data['job_description'],
+                'job_url': data['job_url'],
+                'resume_id': resume_id,
+                'status': 'new',
+                'created_at': 'now()',
+                'updated_at': 'now()'
+            }
+
+            response = supabase.table('job_applications')\
+                .insert(job_data)\
+                .execute()
+
+            if not response.data:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to save job"
+                }), 500
+
+            return jsonify({
+                "success": True,
+                "data": response.data[0]
+            })
+
+    except Exception as e:
+        print(f"Error handling jobs request: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/jobs/<job_id>/download', methods=['GET', 'OPTIONS'])
+def download_job_resume(job_id):
+    """Endpoint to get a signed URL for downloading a resume PDF"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        # First verify the job belongs to the user and get the resume ID
+        response = supabase.table('job_applications')\
+            .select('resume:resumes(optimized_pdf_url)')\
+            .eq('id', job_id)\
+            .eq('user_id', user_id)\
+            .execute()
+
+        if not response.data:
+            return jsonify({
+                "success": False,
+                "error": "Resume not found or not authorized"
+            }), 404
+
+        optimized_pdf_url = response.data[0]['resume'].get('optimized_pdf_url')
+        if not optimized_pdf_url:
+            return jsonify({
+                "success": False,
+                "error": "Resume file not found"
+            }), 404
+
+        # Extract the file path from the URL
+        try:
+            file_path = optimized_pdf_url.split('/resumes/')[1].split('?')[0]
+        except:
+            return jsonify({
+                "success": False,
+                "error": "Invalid file URL format"
+            }), 500
+
+        # Generate a fresh signed URL
+        signed_url_response = supabase.storage\
+            .from_('resumes')\
+            .create_signed_url(file_path, 300)  # URL valid for 5 minutes
+
+        if not signed_url_response or 'signedURL' not in signed_url_response:
+            return jsonify({
+                "success": False,
+                "error": "Failed to generate download URL"
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "url": signed_url_response['signedURL']
+        })
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 @app.route('/api/jobs/<job_id>/status', methods=['PUT', 'OPTIONS'])
-def job_status(job_id):
-    """Handle job status endpoint"""
+def update_job_status(job_id):
+    """Update job application status"""
     if request.method == 'OPTIONS':
         response = make_response()
         response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
@@ -979,123 +1091,53 @@ def job_status(job_id):
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
 
-    return update_job_status(job_id)
-
-# Move these to be helper functions
-def get_jobs():
-    """Get all jobs for a user"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "Missing X-User-Id header"}), 401
-
-        print(f"Getting jobs for user: {user_id}")
-        
-        # Get jobs from Supabase with resume data
-        response = supabase.table('job_applications')\
-            .select('*, resume:resumes(id, analysis, title, created_at)')\
-            .eq('user_id', user_id)\
-            .order('created_at')\
-            .execute()
-
-        print(f"Raw response data: {response.data}")
-
-        if not response.data:
-            return jsonify([])
-
-        # Transform the response to include resume analysis
-        jobs = []
-        for job in response.data:
-            job_data = {**job}
-            if job.get('resume'):
-                job_data['analysis'] = job['resume'].get('analysis')
-            jobs.append(job_data)
-
-        print(f"Transformed jobs data: {jobs}")
-        return jsonify(jobs)
-    except Exception as e:
-        print(f"Error getting jobs: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-def save_job():
-    """Save a job application"""
-    try:
-        user_id = request.headers.get('X-User-Id')
-        if not user_id:
-            return jsonify({"error": "Missing X-User-Id header"}), 401
-
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Missing request body"}), 400
-
-        required_fields = ['job_title', 'company', 'job_description', 'job_url']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({"error": f"Missing required field: {field}"}), 400
-
-        # Get the latest resume for this user
-        resume_response = supabase.table('resumes')\
-            .select('id')\
-            .eq('user_id', user_id)\
-            .order('created_at')\
-            .limit(1)\
-            .execute()
-
-        resume_id = resume_response.data[0]['id'] if resume_response.data else None
-
-        # Save job to Supabase
-        job_data = {
-            'user_id': user_id,
-            'job_title': data['job_title'],
-            'company': data['company'],
-            'job_description': data['job_description'],
-            'job_url': data['job_url'],
-            'resume_id': resume_id,
-            'status': 'pending'
-        }
-
-        response = supabase.table('job_applications')\
-            .insert(job_data)\
-            .execute()
-
-        if not response.data:
-            return jsonify({"error": "Failed to save job"}), 500
-
-        return jsonify(response.data[0])
-    except Exception as e:
-        print(f"Error saving job: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-def update_job_status(job_id):
-    """Update job application status"""
-    try:
-        user_id = request.headers.get('X-User-Id')
-        if not user_id:
-            return jsonify({"error": "Missing X-User-Id header"}), 401
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
 
         data = request.get_json()
         if not data or 'status' not in data:
-            return jsonify({"error": "Missing status in request body"}), 400
+            return jsonify({
+                "success": False,
+                "error": "Missing status in request body"
+            }), 400
 
         # Verify valid status
-        valid_statuses = ['pending', 'applied', 'interviewing', 'offered', 'rejected']
+        valid_statuses = ['new', 'applied', 'interviewing', 'offered', 'rejected']
         if data['status'] not in valid_statuses:
-            return jsonify({"error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"}), 400
+            return jsonify({
+                "success": False,
+                "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+            }), 400
 
         # Update job in Supabase
         response = supabase.table('job_applications')\
-            .update({'status': data['status']})\
+            .update({'status': data['status'], 'updated_at': 'now()'})\
             .eq('id', job_id)\
             .eq('user_id', user_id)\
             .execute()
 
         if not response.data:
-            return jsonify({"error": "Job not found or not authorized"}), 404
+            return jsonify({
+                "success": False,
+                "error": "Job not found or not authorized"
+            }), 404
 
-        return jsonify(response.data[0])
+        return jsonify({
+            "success": True,
+            "data": response.data[0]
+        })
+
     except Exception as e:
         print(f"Error updating job status: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 def validate_environment():
     """Validate required environment variables"""
@@ -1137,9 +1179,10 @@ def main():
     print("- GET /api/resumes - Get user's resumes")
     print("- GET /api/resumes/<id>/download - Download resume")
     print("- DELETE /api/resumes/<id> - Delete resume")
-    print("- GET /api/jobs - Get user's job applications")
-    print("- POST /api/jobs - Save a job application")
-    print("- PUT /api/jobs/<id>/status - Update job application status")
+    print("- GET /job/<job_id> - Get job details by ID")
+    print("- GET /api/jobs - Get user's jobs")
+    print("- POST /api/jobs - Create new job application")
+    print("- PUT /api/jobs/<job_id>/status - Update job application status")
     
     # Run the application with hot reloading
     app.run(

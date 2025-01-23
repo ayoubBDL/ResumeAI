@@ -51,10 +51,6 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
     const response = await fetch(`${API_URL}/optimize`, {
       method: 'POST',
       body: formData,
-      credentials: 'include',
-      headers: {
-        'X-User-Id': session.user.id
-      }
     });
 
     if (!response.ok) {

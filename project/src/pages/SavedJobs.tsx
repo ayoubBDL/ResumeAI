@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { getJobApplications, JobApplication, getResumeDownloadUrl } from '../services/api';
+import { getJobApplications, updateJobApplicationStatus, JobApplication, getResumeDownloadUrl } from '../services/api';
 import { format } from 'date-fns';
 import { Building2, Calendar, ExternalLink, Search, BookOpen, Download } from 'lucide-react';
 import AnalysisModal from '../components/AnalysisModal';
@@ -54,9 +54,49 @@ export default function SavedJobs() {
   const handleDownload = async (resumeId: string, jobTitle: string, userId: string) => {
     try {
       setIsDownloading(true);
-      await downloadResume(resumeId, jobTitle);
+      setError(null);
+      
+      // Get the signed URL from the backend
+      const response = await fetch(`/api/resumes/${resumeId}/download`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': userId
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get download URL');
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.url) {
+        throw new Error(data.error || 'Failed to get download URL');
+      }
+
+      // Fetch the actual PDF content
+      const pdfResponse = await fetch(data.url);
+      if (!pdfResponse.ok) {
+        throw new Error('Failed to download PDF');
+      }
+
+      const pdfBlob = await pdfResponse.blob();
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+
+      // Create a temporary link element to trigger download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `${jobTitle || 'resume'}.pdf`);
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Error downloading resume:', error);
+      setError(error instanceof Error ? error.message : 'Failed to download resume');
     } finally {
       setIsDownloading(false);
     }
@@ -156,13 +196,35 @@ export default function SavedJobs() {
                           Advice <BookOpen className="ml-2 -mr-0.5 h-4 w-4" />
                         </button>
                       )}
+                      <select
+                        value={job.status}
+                        onChange={async (e) => {
+                          try {
+                            const newStatus = e.target.value as JobApplication['status'];
+                            await updateJobApplicationStatus(job.id, newStatus);
+                            // Refresh the jobs list
+                            const updatedJobs = await getJobApplications(user.id);
+                            setJobs(updatedJobs);
+                          } catch (error) {
+                            console.error('Error updating job status:', error);
+                          }
+                        }}
+                        className="mt-1 block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="applied">Applied</option>
+                        <option value="interviewing">Interviewing</option>
+                        <option value="offered">Offered</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
                       {job.resume_id && (
                         <button
                           onClick={() => handleDownload(job.resume_id!, job.job_title, user?.id || '')}
                           disabled={isDownloading}
                           className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isDownloading ? 'Downloading...' : 'Download Resume'} <Download className="ml-2 -mr-0.5 h-4 w-4" />
+                          <Download className="h-5 w-5 mr-2" />
+                          Download Resume
                         </button>
                       )}
                     </div>
