@@ -132,25 +132,61 @@ def generate_with_openai(prompt):
 
         PART 2: IMPROVEMENT ANALYSIS
         ===========================
-        Provide a structured analysis with these sections:
+        Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
 
-        1. KEY IMPROVEMENTS MADE:
-        • List specific improvements made to the resume (use bullet points)
-        • Explain how each change better targets the job
-        • Highlight key skills and experiences emphasized
+        [SECTION:IMPROVEMENTS]
+        • Reorganized Content
+        - Restructured sections for better flow
+        - Enhanced readability and scannability
+        
+        • Enhanced Technical Skills
+        - Added relevant technologies from job description
+        - Prioritized key required skills
+        
+        • Strengthened Experience
+        - Added quantifiable metrics
+        - Highlighted leadership roles
+        
+        • Optimized Keywords
+        - Incorporated job-specific terms
+        - Added industry-standard variations
+        [/SECTION]
 
-        2. INTERVIEW PREPARATION ADVICE:
-        • Key talking points for the interview
-        • How to discuss the highlighted experiences
-        • Technical topics to review
-        • Potential questions to prepare for
-        • STAR method examples for key achievements
+        [SECTION:INTERVIEW]
+        • Technical Topics
+        - Key areas from job requirements
+        - System design considerations
+        
+        • Project Highlights
+        - Prepare STAR stories for key projects
+        - Focus on technical challenges solved
+        
+        • Key Questions
+        - Prepare for role-specific scenarios
+        - Technical implementation details
+        
+        • Discussion Points
+        - Team collaboration examples
+        - Code quality practices
+        [/SECTION]
 
-        3. NEXT STEPS:
-        • Additional skills to develop
-        • Certifications to consider
-        • Portfolio suggestions
-        • Networking recommendations
+        [SECTION:NEXTSTEPS]
+        • Skills Development
+        - Identify skill gaps
+        - Learning resources
+        
+        • Certifications
+        - Relevant technical certifications
+        - Industry-specific training
+        
+        • Portfolio Enhancement
+        - Project suggestions
+        - Skills to demonstrate
+        
+        • Industry Knowledge
+        - Technology trends
+        - Professional networking
+        [/SECTION]
 
         FINAL CHECK - VERIFY:
         1. Resume is SPECIFICALLY TAILORED to job description
@@ -158,7 +194,7 @@ def generate_with_openai(prompt):
         3. Skills and technologies MATCH job requirements
         4. NO fictional or assumed information
         5. Original contact details preserved
-        6. Both PART 1 and PART 2 included with clear separation
+        6. Analysis sections use EXACT format with [SECTION:NAME] markers
 
         ‼️ IMPORTANT: Show the COMPLETE response with both parts clearly separated.
         """},
@@ -567,7 +603,7 @@ def optimize_resume():
         
         # Prepare prompt for AI model
         print("[Optimize] Preparing prompt for optimization...")
-        prompt = f"""You are an expert ATS optimization and career advisor. Analyze this resume for a {job_details['title']} position and provide TWO parts: an optimized resume and a detailed analysis.
+        prompt = f"""Analyze this resume for a {job_details['title']} position and provide TWO parts: an optimized resume and a detailed analysis.
 
         Original Resume:
         {resume_text}
@@ -595,29 +631,65 @@ def optimize_resume():
 
         PART 2: DETAILED ANALYSIS
         =======================
+        Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
 
-        1. KEY IMPROVEMENTS MADE:
-        • List 3-5 specific improvements made to the resume
-        • Focus on content reorganization and emphasis
-        • Explain how each change improves ATS matching
-        • Highlight key skills and experiences emphasized
+        [SECTION:IMPROVEMENTS]
+        • Reorganized Content
+        - Restructured sections for better flow
+        - Enhanced readability and scannability
+        
+        • Enhanced Technical Skills
+        - Added relevant technologies from job description
+        - Prioritized key required skills
+        
+        • Strengthened Experience
+        - Added quantifiable metrics
+        - Highlighted leadership roles
+        
+        • Optimized Keywords
+        - Incorporated job-specific terms
+        - Added industry-standard variations
+        [/SECTION]
 
-        2. INTERVIEW PREPARATION ADVICE:
-        • Prepare 3-4 STAR stories from your experience
-        • Key technical topics to review based on job requirements
-        • Suggested responses to common questions
-        • Projects or achievements to highlight
-        • Questions to ask the interviewer
+        [SECTION:INTERVIEW]
+        • Technical Topics
+        - Key areas from job requirements
+        - System design considerations
+        
+        • Project Highlights
+        - Prepare STAR stories for key projects
+        - Focus on technical challenges solved
+        
+        • Key Questions
+        - Prepare for role-specific scenarios
+        - Technical implementation details
+        
+        • Discussion Points
+        - Team collaboration examples
+        - Code quality practices
+        [/SECTION]
 
-        3. NEXT STEPS:
-        • Skills to develop or strengthen
-        • Certifications that would add value
-        • Portfolio projects to consider
-        • Industry knowledge to research
+        [SECTION:NEXTSTEPS]
+        • Skills Development
+        - Identify skill gaps
+        - Learning resources
+        
+        • Certifications
+        - Relevant technical certifications
+        - Industry-specific training
+        
+        • Portfolio Enhancement
+        - Project suggestions
+        - Skills to demonstrate
+        
+        • Industry Knowledge
+        - Technology trends
+        - Professional networking
+        [/SECTION]
 
         IMPORTANT RULES:
-        1. MUST provide all three sections in Part 2
-        2. Use bullet points (•) for all lists
+        1. MUST use the exact section markers: [SECTION:NAME] and [/SECTION]
+        2. Use bullet points (•) for main points and (-) for sub-points
         3. Be specific and actionable in recommendations
         4. Focus on the job requirements
         5. Maintain all original experience and dates
@@ -627,7 +699,101 @@ def optimize_resume():
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",  # Using the original model
             messages=[
-                {"role": "system", "content": "You are an expert ATS optimization and career advisor. Provide detailed, specific advice for both resume optimization and interview preparation."},
+                {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
+
+        CRITICAL - ABSOLUTELY REQUIRED RULES:
+        1. JOB MATCHING (HIGHEST PRIORITY):
+           ‼️ Analyze the job description thoroughly
+           ‼️ Identify key requirements, skills, and qualifications
+           ‼️ Reorganize and emphasize resume content to match job requirements
+           ‼️ Use similar terminology as the job description
+           ‼️ Highlight experiences that directly relate to job requirements
+           ‼️ Ensure technical skills match what's asked in the job
+
+        PART 1: OPTIMIZED RESUME
+        =======================
+        Create a clean, professional resume with these sections:
+        1. Contact Information (keep original details)
+        2. Professional Summary (concise, impactful)
+        3. Technical Skills (prioritize job-relevant skills)
+        4. Professional Experience (emphasize relevant achievements)
+        5. Education (keep as in original)
+
+        FORMAT RULES:
+        - NO headers like "ATS-FRIENDLY" or separator lines
+        - Clean, minimal formatting
+        - Use bullet points (•) for experience and skills
+        - Consistent spacing
+        - No tables or columns
+
+        PART 2: IMPROVEMENT ANALYSIS
+        ===========================
+        Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
+
+        [SECTION:IMPROVEMENTS]
+        • Reorganized Content
+        - Restructured sections for better flow
+        - Enhanced readability and scannability
+        
+        • Enhanced Technical Skills
+        - Added relevant technologies from job description
+        - Prioritized key required skills
+        
+        • Strengthened Experience
+        - Added quantifiable metrics
+        - Highlighted leadership roles
+        
+        • Optimized Keywords
+        - Incorporated job-specific terms
+        - Added industry-standard variations
+        [/SECTION]
+
+        [SECTION:INTERVIEW]
+        • Technical Topics
+        - Key areas from job requirements
+        - System design considerations
+        
+        • Project Highlights
+        - Prepare STAR stories for key projects
+        - Focus on technical challenges solved
+        
+        • Key Questions
+        - Prepare for role-specific scenarios
+        - Technical implementation details
+        
+        • Discussion Points
+        - Team collaboration examples
+        - Code quality practices
+        [/SECTION]
+
+        [SECTION:NEXTSTEPS]
+        • Skills Development
+        - Identify skill gaps
+        - Learning resources
+        
+        • Certifications
+        - Relevant technical certifications
+        - Industry-specific training
+        
+        • Portfolio Enhancement
+        - Project suggestions
+        - Skills to demonstrate
+        
+        • Industry Knowledge
+        - Technology trends
+        - Professional networking
+        [/SECTION]
+
+        FINAL CHECK - VERIFY:
+        1. Resume is SPECIFICALLY TAILORED to job description
+        2. ALL experience is included but PRIORITIZED for relevance
+        3. Skills and technologies MATCH job requirements
+        4. NO fictional or assumed information
+        5. Original contact details preserved
+        6. Analysis sections use EXACT format with [SECTION:NAME] markers
+
+        ‼️ IMPORTANT: Show the COMPLETE response with both parts clearly separated.
+        """},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,

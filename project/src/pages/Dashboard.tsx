@@ -159,13 +159,14 @@ export default function Dashboard() {
 
             <div>
               <label htmlFor="job-url" className="block text-sm font-medium text-gray-700">
-                LinkedIn Job URL (Optional)
+                LinkedIn Job URL *
               </label>
               <div className="mt-1">
                 <input
                   type="url"
                   name="job-url"
                   id="job-url"
+                  required
                   value={jobUrl}
                   onChange={(e) => setJobUrl(e.target.value)}
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"

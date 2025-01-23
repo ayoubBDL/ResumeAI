@@ -145,22 +145,64 @@ class OpenAIOptimizer:
         Provide the complete optimized resume text here, using the markdown formatting and structure specified above.
 
         PART 2: DETAILED ANALYSIS
-        1. KEY IMPROVEMENTS MADE:
-        - List specific optimizations and their alignment with job requirements
-        - Explain how each major change improves match with job description
+        Format the analysis exactly as shown below, maintaining the exact structure and markers:
 
-        2. INTERVIEW PREPARATION ADVICE:
-        - Key technical areas to prepare for based on job requirements
-        - Specific projects/experiences to highlight in interviews
-        - Potential technical questions based on job requirements
+        [SECTION:IMPROVEMENTS]
+        • Reorganized Content
+        - Restructured sections for better flow
+        - Enhanced readability and scannability
+        
+        • Enhanced Technical Skills
+        - Added relevant technologies
+        - Prioritized key skills
+        
+        • Strengthened Experience
+        - Added quantifiable metrics
+        - Highlighted leadership roles
+        
+        • Optimized Keywords
+        - Incorporated job-specific terms
+        - Added industry-standard variations
+        [/SECTION]
 
-        3. NEXT STEPS:
-        - Recommended certifications or skills to acquire
-        - Areas for improvement
-        - Additional ways to strengthen the application
+        [SECTION:INTERVIEW]
+        • Technical Topics
+        - Review system design principles
+        - Practice algorithm optimization
+        
+        • Project Highlights
+        - Prepare STAR stories for key projects
+        - Focus on technical challenges solved
+        
+        • Key Questions
+        - How do you handle scalability?
+        - Describe your testing approach
+        
+        • Discussion Points
+        - Team collaboration examples
+        - Code quality practices
+        [/SECTION]
 
-        Ensure each section is properly formatted with markdown titles and maintain consistent spacing throughout the resume.
-        Focus on creating a clean, professional layout while incorporating all relevant information from the original resume.
+        [SECTION:NEXTSTEPS]
+        • Skills Development
+        - Learn new framework versions
+        - Deepen cloud expertise
+        
+        • Certifications
+        - Relevant technical certifications
+        - Industry-specific training
+        
+        • Portfolio Enhancement
+        - Add more complex projects
+        - Showcase specific skills
+        
+        • Industry Knowledge
+        - Follow technology trends
+        - Join professional communities
+        [/SECTION]
+
+        Ensure each section follows this exact format with main points marked by • and sub-points marked by -. 
+        Keep the section markers exactly as shown: [SECTION:NAME] and [/SECTION].
         """
         return prompt
 
