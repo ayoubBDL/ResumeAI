@@ -47,10 +47,14 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
       throw new Error('User not authenticated');
     }
 
-    // Call the optimization endpoint first
+    // Call the optimization endpoint
     const response = await fetch(`${API_URL}/optimize`, {
       method: 'POST',
       body: formData,
+      credentials: 'include',
+      headers: {
+        'X-User-Id': session.user.id
+      }
     });
 
     if (!response.ok) {
@@ -59,125 +63,27 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
       throw new Error('Failed to optimize resume');
     }
 
-    // Check content type
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      console.error('Unexpected content type:', contentType);
-      throw new Error('Server returned invalid response format');
+    const responseData = await response.json();
+    if (!responseData.success) {
+      throw new Error(responseData.error || 'Failed to optimize resume');
     }
 
-    // Get the response data
-    let responseData;
-    try {
-      responseData = await response.json();
-      console.log('[DEBUG] Response data:', responseData);
-    } catch (error) {
-      console.error('Error parsing response:', error);
-      throw new Error('Failed to parse server response');
-    }
-
-    if (!responseData.success || !responseData.pdf_data || !responseData.analysis) {
-      console.error('Invalid response data:', responseData);
-      throw new Error('Server returned incomplete data');
-    }
-
-    // Convert base64 PDF to blob
+    // Create a blob from the base64 PDF data
     const pdfBlob = base64ToBlob(responseData.pdf_data, 'application/pdf');
-    if (pdfBlob.size === 0) {
-      throw new Error('Received empty PDF from server');
-    }
+    const blobUrl = URL.createObjectURL(pdfBlob);
 
-    const originalFile = formData.get('resume') as File;
-    const safeFileName = originalFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${Date.now()}_${safeFileName}`;
-    
-    console.log('Uploading file:', {
-      filename,
-      contentType: pdfBlob.type,
-      size: pdfBlob.size
-    });
-    
-    // Create a new blob with explicit PDF type
-    const pdfBlobWithType = new Blob([pdfBlob], { type: 'application/pdf' });
-    
-    // Upload optimized PDF to Supabase Storage
-    const { error: uploadError } = await supabase.storage
-      .from('resumes')
-      .upload(filename, pdfBlobWithType, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: 'application/pdf'
-      });
+    // Return the resume data from the backend response
+    return {
+      id: responseData.resume_id,
+      user_id: session.user.id,
+      title: responseData.title || 'Optimized Resume',
+      created_at: responseData.created_at || new Date().toISOString(),
+      optimized_pdf_url: blobUrl,
+      analysis: responseData.analysis,
+      job_url: responseData.job_url,
+      status: responseData.status || 'completed'
+    };
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw uploadError;
-    }
-
-    // Get public URL for the PDF
-    const { data } = await supabase.storage
-      .from('resumes')
-      .createSignedUrl(filename, 60 * 60); // 1 hour expiry
-
-    if (!data?.signedUrl) {
-      throw new Error('Failed to get signed URL');
-    }
-
-    console.log('File uploaded successfully:', {
-      filename,
-      url: data.signedUrl
-    });
-
-    // Create database record for resume
-    const { data: resumeRecord, error: createError } = await supabase
-      .from('resumes')
-      .insert({
-        user_id: session.user.id,
-        title: safeFileName,
-        job_url: formData.get('job_url'),
-        optimized_pdf_url: data.signedUrl,
-        analysis: responseData.analysis,
-        status: 'completed'
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      console.error('Database error:', createError);
-      throw createError;
-    }
-
-    // Get job details from the form data
-    const jobUrl = formData.get('job_url') as string;
-    const jobTitle = formData.get('job_title') as string;
-    const company = formData.get('company') as string;
-    const jobDescription = formData.get('job_description') as string;
-
-    // Save the job application
-    if (jobUrl && jobTitle && company) {
-      try {
-        const { data: jobRecord } = await supabase
-          .from('job_applications')
-          .insert({
-            user_id: session.user.id,
-            resume_id: resumeRecord.id, // Link the resume to the job
-            job_title: jobTitle,
-            company: company,
-            job_description: jobDescription,
-            job_url: jobUrl,
-            status: 'pending'
-          })
-          .select()
-          .single();
-
-        console.log('Job saved successfully:', jobRecord);
-      } catch (error) {
-        // Don't fail the whole process if job saving fails
-        console.error('Error saving job:', error);
-      }
-    }
-
-    return resumeRecord;
   } catch (error) {
     console.error('Error in optimizeResume:', error);
     throw error;

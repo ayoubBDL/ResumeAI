@@ -18,6 +18,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowabl
 import re
 import tempfile
 import time
+from bs4 import BeautifulSoup
+from supabase import create_client, Client
+import datetime
 
 # Load environment variables
 load_dotenv()
@@ -25,6 +28,14 @@ api_key = os.getenv('OPENAI_API_KEY')
 if not api_key:
     raise ValueError("OpenAI API key not found in environment variables")
 openai.api_key = api_key
+
+# Initialize Supabase client
+supabase_url = os.getenv('SUPABASE_URL')
+supabase_key = os.getenv('SUPABASE_KEY')
+if not supabase_url or not supabase_key:
+    raise ValueError(f"Supabase credentials not found. URL: {'set' if supabase_url else 'missing'}, Key: {'set' if supabase_key else 'missing'}")
+
+supabase: Client = create_client(supabase_url, supabase_key)
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -236,164 +247,210 @@ def generate_with_ollama(prompt):
 def create_pdf_from_text(text):
     """Convert text to PDF using ReportLab with enhanced formatting"""
     try:
-        # Create a temporary file with a unique name
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', mode='wb') as temp_file:
-            temp_path = temp_file.name
+        # Create a BytesIO buffer instead of a temporary file
+        buffer = io.BytesIO()
+        
+        # Set up the document with proper margins
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            leftMargin=0.75*inch,
+            rightMargin=0.75*inch,
+            topMargin=0.75*inch,
+            bottomMargin=0.75*inch
+        )
+        
+        # Create custom styles
+        styles = getSampleStyleSheet()
+        
+        # Name style
+        styles.add(ParagraphStyle(
+            name='Name',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=12,
+            textColor=colors.HexColor('#2C3E50'),
+            fontName='Helvetica-Bold'
+        ))
+        
+        # Section heading style
+        styles.add(ParagraphStyle(
+            name='SectionHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceBefore=12,
+            spaceAfter=8,
+            textColor=colors.HexColor('#2C3E50'),
+            fontName='Helvetica-Bold'
+        ))
+        
+        # Normal text style
+        styles.add(ParagraphStyle(
+            name='NormalText',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=6,
+            fontName='Helvetica',
+            leading=14
+        ))
+        
+        # Contact info style
+        styles.add(ParagraphStyle(
+            name='ContactInfo',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=2,
+            fontName='Helvetica',
+            textColor=colors.HexColor('#34495E')
+        ))
+        
+        # Parse the text and build the document
+        story = []
+        lines = text.split('\n')
+        current_section = []
+        in_contact_section = False
+        skip_next = False
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
             
-            # Set up the document with proper margins
-            doc = SimpleDocTemplate(
-                temp_path,
-                pagesize=letter,
-                leftMargin=0.75*inch,
-                rightMargin=0.75*inch,
-                topMargin=0.75*inch,
-                bottomMargin=0.75*inch
-            )
+            # Skip ATS header and separator lines
+            if "ATS-FRIENDLY" in line or "=" * 10 in line:
+                continue
             
-            # Create custom styles
-            styles = getSampleStyleSheet()
+            # Remove markers and clean up the text
+            line = re.sub(r'^PART \d+:', '', line)  # Remove "PART X:" headers
+            line = re.sub(r'\*\*|\#\#', '', line)   # Remove ** and ## markers
+            line = line.strip()
+            if not line:
+                continue
             
-            # Name style
-            styles.add(ParagraphStyle(
-                name='Name',
-                parent=styles['Heading1'],
-                fontSize=18,
-                spaceAfter=12,
-                textColor=colors.HexColor('#2C3E50'),
-                fontName='Helvetica-Bold'
-            ))
-            
-            # Section heading style
-            styles.add(ParagraphStyle(
-                name='SectionHeading',
-                parent=styles['Heading2'],
-                fontSize=14,
-                spaceBefore=12,
-                spaceAfter=8,
-                textColor=colors.HexColor('#2C3E50'),
-                fontName='Helvetica-Bold'
-            ))
-            
-            # Normal text style
-            styles.add(ParagraphStyle(
-                name='NormalText',
-                parent=styles['Normal'],
-                fontSize=11,
-                spaceAfter=6,
-                fontName='Helvetica',
-                leading=14
-            ))
-            
-            # Contact info style
-            styles.add(ParagraphStyle(
-                name='ContactInfo',
-                parent=styles['Normal'],
-                fontSize=11,
-                spaceAfter=2,
-                fontName='Helvetica',
-                textColor=colors.HexColor('#34495E')
-            ))
-            
-            # Parse the text and build the document
-            story = []
-            lines = text.split('\n')
-            current_section = []
-            in_contact_section = False
-            skip_next = False
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # Skip ATS header and separator lines
-                if "ATS-FRIENDLY" in line or "=" * 10 in line:
-                    continue
-                
-                # Remove markers and clean up the text
-                line = re.sub(r'^PART \d+:', '', line)  # Remove "PART X:" headers
-                line = re.sub(r'\*\*|\#\#', '', line)   # Remove ** and ## markers
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # Handle different sections
-                if "PROFESSIONAL SUMMARY" in line.upper():
-                    story.append(Paragraph("Summary", styles['SectionHeading']))
-                elif "PROFESSIONAL EXPERIENCE" in line.upper():
-                    story.append(Paragraph("Experience", styles['SectionHeading']))
-                elif "EDUCATION" in line.upper():
-                    story.append(Paragraph("Education", styles['SectionHeading']))
-                elif "SKILLS" in line.upper():
-                    story.append(Paragraph("Skills", styles['SectionHeading']))
-                elif "CONTACT SECTION" in line.upper():
-                    continue  # Skip this header
-                elif line.startswith('[LinkedIn]'):
-                    # Clean up LinkedIn URL
-                    url = re.search(r'\((.*?)\)', line).group(1)
-                    story.append(Paragraph(f'LinkedIn: {url}', styles['ContactInfo']))
-                elif ':' in line and not in_contact_section:
-                    # Handle contact info
-                    label, value = line.split(':', 1)
-                    story.append(Paragraph(
-                        f'{label.strip()}: {value.strip()}',
-                        styles['ContactInfo']
-                    ))
-                elif line.startswith('•') or line.startswith('-'):
-                    # Add bullet point
-                    current_section.append(line[1:].strip())
-                else:
-                    # Add normal paragraph
-                    if current_section:
-                        # Add any collected bullet points before adding new paragraph
-                        story.append(ListFlowable(
-                            [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
-                            bulletType='bullet',
-                            leftIndent=20,
-                            spaceBefore=4,
-                            spaceAfter=4
-                        ))
-                        current_section = []
-                    
-                    # Check if this is the name (first non-header line)
-                    if not story:
-                        story.append(Paragraph(line, styles['Name']))
-                    else:
-                        story.append(Paragraph(line, styles['NormalText']))
-            
-            # Add any remaining bullet points
-            if current_section:
-                story.append(ListFlowable(
-                    [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
-                    bulletType='bullet',
-                    leftIndent=20,
-                    spaceBefore=4,
-                    spaceAfter=4
+            # Handle different sections
+            if "PROFESSIONAL SUMMARY" in line.upper():
+                story.append(Paragraph("Summary", styles['SectionHeading']))
+            elif "PROFESSIONAL EXPERIENCE" in line.upper():
+                story.append(Paragraph("Experience", styles['SectionHeading']))
+            elif "EDUCATION" in line.upper():
+                story.append(Paragraph("Education", styles['SectionHeading']))
+            elif "SKILLS" in line.upper():
+                story.append(Paragraph("Skills", styles['SectionHeading']))
+            elif "CONTACT SECTION" in line.upper():
+                continue  # Skip this header
+            elif line.startswith('[LinkedIn]'):
+                # Clean up LinkedIn URL
+                url = re.search(r'\((.*?)\)', line).group(1)
+                story.append(Paragraph(f'LinkedIn: {url}', styles['ContactInfo']))
+            elif ':' in line and not in_contact_section:
+                # Handle contact info
+                label, value = line.split(':', 1)
+                story.append(Paragraph(
+                    f'{label.strip()}: {value.strip()}',
+                    styles['ContactInfo']
                 ))
-            
-            # Build PDF
-            doc.build(story)
-            
-        return temp_path
+            elif line.startswith('•') or line.startswith('-'):
+                # Add bullet point
+                current_section.append(line[1:].strip())
+            else:
+                # Add normal paragraph
+                if current_section:
+                    # Add any collected bullet points before adding new paragraph
+                    story.append(ListFlowable(
+                        [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
+                        bulletType='bullet',
+                        leftIndent=20,
+                        spaceBefore=4,
+                        spaceAfter=4
+                    ))
+                    current_section = []
+                
+                # Check if this is the name (first non-header line)
+                if not story:
+                    story.append(Paragraph(line, styles['Name']))
+                else:
+                    story.append(Paragraph(line, styles['NormalText']))
+        
+        # Add any remaining bullet points
+        if current_section:
+            story.append(ListFlowable(
+                [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
+                bulletType='bullet',
+                leftIndent=20,
+                spaceBefore=4,
+                spaceAfter=4
+            ))
+        
+        # Build PDF into the buffer
+        doc.build(story)
+        
+        # Get the PDF bytes
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        return pdf_bytes
+        
     except Exception as e:
-        print(f"[PDF ERROR] Error creating PDF: {str(e)}")
-        if 'temp_path' in locals():
-            try:
-                os.unlink(temp_path)
-            except:
-                pass
-        raise e
+        print(f"Error creating PDF: {str(e)}")
+        raise
+
+def extract_job_details(job_url):
+    """Extract job details from LinkedIn job URL"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(job_url, headers=headers)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Extract job title
+        job_title = soup.find('h1', {'class': 'top-card-layout__title'})
+        job_title = job_title.text.strip() if job_title else ''
+        
+        # Extract company
+        company = soup.find('a', {'class': 'topcard__org-name-link'})
+        company = company.text.strip() if company else ''
+        
+        # Extract job description
+        job_description = soup.find('div', {'class': 'show-more-less-html__markup'})
+        job_description = job_description.text.strip() if job_description else ''
+        
+        return {
+            'job_title': job_title,
+            'company': company,
+            'job_description': job_description
+        }
+    except Exception as e:
+        print(f"Error extracting job details: {e}")
+        return None
+
 
 def split_ai_response(response):
     """Split OpenAI response into resume and analysis parts"""
-    # Find the parts using regex
-    resume_match = re.search(r'PART 1:.*?(?=PART 2:|$)', response, re.DOTALL)
-    analysis_match = re.search(r'PART 2:.*?(?=FINAL CHECK|$)', response, re.DOTALL)
+    # Find all sections using regex
+    sections = re.split(r'\[SECTION:\s*([^\]]+)\]', response)
     
-    resume_text = resume_match.group(0) if resume_match else ""
-    analysis_text = analysis_match.group(0) if analysis_match else ""
+    if len(sections) > 1:
+        # First part is the resume content
+        resume_content = sections[0].strip()
+        
+        # Combine all sections into analysis
+        analysis_parts = []
+        for i in range(1, len(sections), 2):
+            if i + 1 < len(sections):
+                section_name = sections[i].strip()
+                section_content = sections[i + 1].strip()
+                analysis_parts.append(f"[{section_name}]\n{section_content}")
+        
+        analysis = "\n\n".join(analysis_parts)
+    else:
+        # If no sections found, treat everything as resume content
+        resume_content = response.strip()
+        analysis = ""
     
-    return resume_text.strip(), analysis_text.strip()
+    return resume_content, analysis
 
 @app.route('/')
 def home():
@@ -547,322 +604,215 @@ def search_similar_jobs():
 
 @app.route('/optimize', methods=['POST'])
 def optimize_resume():
-    temp_pdf_path = None
     try:
-        print("\n[Optimize] Starting resume optimization request")
-        print(f"[Optimize] Request Content-Type: {request.content_type}")
-        print(f"[Optimize] Files in request: {list(request.files.keys())}")
-        
-        # Check for resume file
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 401
+
+        # Get the uploaded file and job details
         if 'resume' not in request.files:
-            print("[Optimize ERROR] No resume file in request")
-            return jsonify({
-                "success": False,
-                "error": "No resume file provided"
-            }), 400
-            
+            return jsonify({'error': 'No resume file provided'}), 400
+        
         resume_file = request.files['resume']
-        if resume_file.filename == '':
-            print("[Optimize ERROR] Empty filename")
-            return jsonify({
-                "success": False,
-                "error": "No resume file selected"
-            }), 400
-            
-        print(f"[Optimize] Resume file received: {resume_file.filename}")
-            
-        # Check for job URL
+        if not resume_file or not resume_file.filename:
+            return jsonify({'error': 'No resume file selected'}), 400
+
+        # Get job details from form data
         job_url = request.form.get('job_url')
-        if not job_url:
-            print("[Optimize ERROR] No job URL provided")
-            return jsonify({
-                "success": False,
-                "error": "Missing job_url in request"
-            }), 400
-            
-        print(f"[Optimize] Job URL received: {job_url}")
         
-        # Get job details using the LinkedIn scraper
-        print("[Optimize] Fetching job details from LinkedIn...")
-        scraper = LinkedInJobScraper()
-        job_details = scraper.get_job_details(job_url)
+        # Extract job details from LinkedIn URL if available
+        job_title = None
+        company = None
+        job_description = None
         
-        if not job_details:
-            print("[Optimize ERROR] Failed to get job details")
-            return jsonify({
-                "success": False,
-                "error": "Failed to get job details"
-            }), 404
-            
-        print("[Optimize] Successfully retrieved job details")
-        
+        if job_url and 'linkedin.com' in job_url:
+            try:
+                job_details = extract_job_details(job_url)
+                if job_details:
+                    job_title = job_details.get('job_title')
+                    company = job_details.get('company')
+                    job_description = job_details.get('job_description')
+            except Exception as e:
+                print(f"Error extracting job details: {str(e)}")
+                # Continue without job details if extraction fails
+
         # Extract text from PDF
-        print("[Optimize] Starting PDF text extraction...")
         resume_text = extract_text_from_pdf(resume_file)
-        print("[Optimize] Successfully extracted text from PDF")
-        
-        # Prepare prompt for AI model
-        print("[Optimize] Preparing prompt for optimization...")
-        prompt = f"""Analyze this resume for a {job_details['title']} position and provide TWO parts: an optimized resume and a detailed analysis.
+        if not resume_text:
+            return jsonify({'error': 'Failed to extract text from PDF'}), 400
 
-        Original Resume:
-        {resume_text}
-
-        Job Description:
-        {job_details['description']}
-
-        Provide your response in TWO clearly marked sections:
-
-        PART 1: OPTIMIZED RESUME
-        =======================
-        Create a clean, professional resume with these sections:
-        1. Contact Information (keep original details)
-        2. Summary (2-3 lines highlighting most relevant qualifications)
-        3. Skills (prioritize relevant technical skills)
-        4. Experience (emphasize achievements and metrics)
-        5. Education (if present in original)
-
-        Format Rules:
-        - Remove any "ATS-FRIENDLY" headers or separator lines
-        - Use clean, consistent formatting
-        - Use bullet points (•) for experience and skills
-        - Keep original dates and company names
-        - Highlight metrics and achievements
-
-        PART 2: DETAILED ANALYSIS
-        =======================
-        Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
-
-        [SECTION:IMPROVEMENTS]
-        • Reorganized Content
-        - Restructured sections for better flow
-        - Enhanced readability and scannability
-        
-        • Enhanced Technical Skills
-        - Added relevant technologies from job description
-        - Prioritized key required skills
-        
-        • Strengthened Experience
-        - Added quantifiable metrics
-        - Highlighted leadership roles
-        
-        • Optimized Keywords
-        - Incorporated job-specific terms
-        - Added industry-standard variations
-        [/SECTION]
-
-        [SECTION:INTERVIEW]
-        • Technical Topics
-        - Key areas from job requirements
-        - System design considerations
-        
-        • Project Highlights
-        - Prepare STAR stories for key projects
-        - Focus on technical challenges solved
-        
-        • Key Questions
-        - Prepare for role-specific scenarios
-        - Technical implementation details
-        
-        • Discussion Points
-        - Team collaboration examples
-        - Code quality practices
-        [/SECTION]
-
-        [SECTION:NEXTSTEPS]
-        • Skills Development
-        - Identify skill gaps
-        - Learning resources
-        
-        • Certifications
-        - Relevant technical certifications
-        - Industry-specific training
-        
-        • Portfolio Enhancement
-        - Project suggestions
-        - Skills to demonstrate
-        
-        • Industry Knowledge
-        - Technology trends
-        - Professional networking
-        [/SECTION]
-
-        IMPORTANT RULES:
-        1. MUST use the exact section markers: [SECTION:NAME] and [/SECTION]
-        2. Use bullet points (•) for main points and (-) for sub-points
-        3. Be specific and actionable in recommendations
-        4. Focus on the job requirements
-        5. Maintain all original experience and dates
-        """
-
-        print("[Optimize] Sending request to AI model...")
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  # Using the original model
-            messages=[
-                {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
-
-        CRITICAL - ABSOLUTELY REQUIRED RULES:
-        1. JOB MATCHING (HIGHEST PRIORITY):
-           ‼️ Analyze the job description thoroughly
-           ‼️ Identify key requirements, skills, and qualifications
-           ‼️ Reorganize and emphasize resume content to match job requirements
-           ‼️ Use similar terminology as the job description
-           ‼️ Highlight experiences that directly relate to job requirements
-           ‼️ Ensure technical skills match what's asked in the job
-
-        PART 1: OPTIMIZED RESUME
-        =======================
-        Create a clean, professional resume with these sections:
-        1. Contact Information (keep original details)
-        2. Professional Summary (concise, impactful)
-        3. Technical Skills (prioritize job-relevant skills)
-        4. Professional Experience (emphasize relevant achievements)
-        5. Education (keep as in original)
-
-        FORMAT RULES:
-        - NO headers like "ATS-FRIENDLY" or separator lines
-        - Clean, minimal formatting
-        - Use bullet points (•) for experience and skills
-        - Consistent spacing
-        - No tables or columns
-
-        PART 2: IMPROVEMENT ANALYSIS
-        ===========================
-        Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
-
-        [SECTION:IMPROVEMENTS]
-        • Reorganized Content
-        - Restructured sections for better flow
-        - Enhanced readability and scannability
-        
-        • Enhanced Technical Skills
-        - Added relevant technologies from job description
-        - Prioritized key required skills
-        
-        • Strengthened Experience
-        - Added quantifiable metrics
-        - Highlighted leadership roles
-        
-        • Optimized Keywords
-        - Incorporated job-specific terms
-        - Added industry-standard variations
-        [/SECTION]
-
-        [SECTION:INTERVIEW]
-        • Technical Topics
-        - Key areas from job requirements
-        - System design considerations
-        
-        • Project Highlights
-        - Prepare STAR stories for key projects
-        - Focus on technical challenges solved
-        
-        • Key Questions
-        - Prepare for role-specific scenarios
-        - Technical implementation details
-        
-        • Discussion Points
-        - Team collaboration examples
-        - Code quality practices
-        [/SECTION]
-
-        [SECTION:NEXTSTEPS]
-        • Skills Development
-        - Identify skill gaps
-        - Learning resources
-        
-        • Certifications
-        - Relevant technical certifications
-        - Industry-specific training
-        
-        • Portfolio Enhancement
-        - Project suggestions
-        - Skills to demonstrate
-        
-        • Industry Knowledge
-        - Technology trends
-        - Professional networking
-        [/SECTION]
-
-        FINAL CHECK - VERIFY:
-        1. Resume is SPECIFICALLY TAILORED to job description
-        2. ALL experience is included but PRIORITIZED for relevance
-        3. Skills and technologies MATCH job requirements
-        4. NO fictional or assumed information
-        5. Original contact details preserved
-        6. Analysis sections use EXACT format with [SECTION:NAME] markers
-
-        ‼️ IMPORTANT: Show the COMPLETE response with both parts clearly separated.
-        """},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=2500
-        )
-
-        # Extract the response
-        ai_response = response.choices[0].message.content.strip()
-        
-        # Split the response into resume and analysis parts using the correct marker
-        parts = ai_response.split("PART 2: DETAILED ANALYSIS")
-        optimized_resume = parts[0].split("PART 1: OPTIMIZED RESUME")[-1].strip() if len(parts) > 0 else ""
-        analysis = parts[1].strip() if len(parts) > 1 else ""
-        
-        print("[DEBUG] Analysis extracted:", analysis)
-        
-        # Create the response object
-        response_data = {
-            "optimized_resume": optimized_resume,
-            "analysis": analysis
-        }
-
-        print("[DEBUG] Final response data:", response_data)
-        
-        # Generate PDF from resume text
-        print("[Optimize] Generating optimized resume PDF...")
-        temp_pdf_path = create_pdf_from_text(optimized_resume)
-        
+        # Get optimization suggestions
         try:
-            # Read the PDF file into memory
-            with open(temp_pdf_path, 'rb') as pdf_file:
-                pdf_data = pdf_file.read()
+            optimization_prompt = f"""
+            Please optimize this resume and provide improvement suggestions. Format your response in clear sections as follows:
+
+            1. First, provide the optimized resume content with proper formatting.
+
+            2. Then add the following sections, each starting with its section marker:
+
+            [SECTION: IMPROVEMENTS]
+            List specific improvements made to the resume and why they enhance it.
+
+            [SECTION: INTERVIEW]
+            Provide preparation tips for interviews based on this resume.
+
+            [SECTION: NEXTSTEPS]
+            Suggest next steps for career development and resume enhancement.
+            """
+            
+            if job_title and company:
+                optimization_prompt += f" Optimize specifically for the position of {job_title} at {company}."
+            
+            optimization_prompt += f"""
+            
+            Original Resume:
+            {resume_text}
+            """
+            
+            if job_description:
+                optimization_prompt += f"""
                 
-            # Create JSON response with PDF data and analysis
-            response = jsonify({
-                "success": True,
-                "analysis": analysis,
-                "pdf_data": base64.b64encode(pdf_data).decode('utf-8')
-            })
+                Job Description:
+                {job_description}
+                """
             
-            # Set content type to application/json
-            response.headers['Content-Type'] = 'application/json'
+            optimization_result = generate_with_openai(optimization_prompt)
             
-            print("[Optimize] Sending JSON response with PDF and analysis...")
-            return response
+            # Split the result into resume content and analysis
+            resume_content, analysis = split_ai_response(optimization_result)
+            
+            # Create PDF from optimized resume content only
+            pdf_data = create_pdf_from_text(resume_content)
+            
+            # Convert PDF data to base64 for response
+            pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
+            
+            # Generate safe filename
+            safe_filename = re.sub(r'[^a-zA-Z0-9.-]', '_', resume_file.filename)
+            filename = f"{int(time.time())}_{safe_filename}"
+            
+            # Create temporary file to store PDF
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', mode='wb') as temp_pdf:
+                temp_pdf.write(pdf_data)
+                temp_pdf.flush()
+                
+                # Upload PDF to Supabase Storage
+                try:
+                    with open(temp_pdf.name, 'rb') as pdf_file:
+                        upload_result = supabase.storage \
+                            .from_('resumes') \
+                            .upload(
+                                path=filename,
+                                file=pdf_file,
+                                file_options={"content-type": "application/pdf"}
+                            )
+                    
+                    if not upload_result:
+                        raise Exception("Failed to upload PDF to storage")
+
+                except Exception as upload_error:
+                    print(f"Upload error: {str(upload_error)}")
+                    raise upload_error
+                finally:
+                    # Clean up temporary file
+                    try:
+                        os.unlink(temp_pdf.name)
+                    except:
+                        pass
+
+            # Get signed URL for the uploaded PDF
+            try:
+                url_result = supabase.storage \
+                    .from_('resumes') \
+                    .create_signed_url(filename, 60 * 60)  # 1 hour expiry
+
+                if not url_result or 'signedURL' not in url_result:
+                    raise Exception("Failed to get signed URL")
+
+                signed_url = url_result['signedURL']
+            except Exception as url_error:
+                print(f"Signed URL error: {str(url_error)}")
+                raise url_error
+
+            # Create resume record in database
+            try:
+                resume_data = {
+                    'user_id': user_id,
+                    'title': safe_filename,
+                    'job_url': job_url,
+                    'optimized_pdf_url': signed_url,
+                    'analysis': analysis,  # Store only the analysis part
+                    'status': 'completed'
+                }
+                
+                resume_result = supabase \
+                    .table('resumes') \
+                    .insert(resume_data) \
+                    .execute()
+
+                if not resume_result.data:
+                    raise Exception("Failed to create resume record")
+
+                resume_id = resume_result.data[0]['id']
+
+                # Create job application if we have job details
+                if job_url and job_title and company:
+                    print(f"Creating job application with details:", {
+                        'job_title': job_title,
+                        'company': company,
+                        'has_description': bool(job_description)
+                    })
+                    
+                    try:
+                        job_data = {
+                            'user_id': user_id,
+                            'resume_id': resume_id,
+                            'job_title': job_title,
+                            'company': company,
+                            'job_description': job_description,
+                            'job_url': job_url,
+                            'status': 'pending'
+                        }
+                        
+                        job_result = supabase \
+                            .table('job_applications') \
+                            .insert(job_data) \
+                            .execute()
+                            
+                        print(f"Job application created:", job_result.data if job_result else None)
+                    except Exception as job_error:
+                        print(f"Error creating job application: {str(job_error)}")
+                        # Don't raise the error as this is not critical
+                else:
+                    print(f"Skipping job application - missing required fields:", {
+                        'has_url': bool(job_url),
+                        'has_title': bool(job_title),
+                        'has_company': bool(company)
+                    })
+
+                # Return success response with base64 PDF data and resume details
+                return jsonify({
+                    'success': True,
+                    'pdf_data': pdf_base64,
+                    'analysis': analysis,  # Return only the analysis part
+                    'resume_id': resume_id,
+                    'title': safe_filename,
+                    'created_at': datetime.datetime.now().isoformat(),
+                    'job_url': job_url,
+                    'status': 'completed'
+                })
+
+            except Exception as db_error:
+                print(f"Database error: {str(db_error)}")
+                raise db_error
+
         except Exception as e:
-            print(f"[Optimize ERROR] Error sending PDF: {str(e)}")
-            raise e
-        finally:
-            # Clean up the temp file
-            try:
-                if os.path.exists(temp_pdf_path):
-                    os.unlink(temp_pdf_path)
-            except Exception as e:
-                print(f"[Optimize WARNING] Failed to clean up temp file: {str(e)}")
-        
+            print(f"Error in optimization process: {str(e)}")
+            return jsonify({'error': f'Optimization failed: {str(e)}'}), 500
+
     except Exception as e:
-        print(f"[Optimize ERROR] Error during optimization: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-    finally:
-        # Clean up temporary file
-        if temp_pdf_path and os.path.exists(temp_pdf_path):
-            try:
-                os.unlink(temp_pdf_path)
-            except Exception as e:
-                print(f"[Optimize WARNING] Failed to clean up temp file: {str(e)}")
+        print(f"Error processing request: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/resumes', methods=['GET', 'OPTIONS'])
 def get_resumes():
@@ -944,7 +894,7 @@ def download_resume(resume_id):
         # Generate a fresh signed URL
         signed_url_response = supabase.storage\
             .from_('resumes')\
-            .create_signed_url(f"{file_path}", 300)  # URL valid for 5 minutes
+            .create_signed_url(file_path, 300)  # URL valid for 5 minutes
 
         if not signed_url_response or 'signedURL' not in signed_url_response:
             return jsonify({"error": "Failed to generate download URL"}), 500
@@ -1143,11 +1093,11 @@ def jobs():
             # Save job to Supabase
             job_data = {
                 'user_id': user_id,
-                'job_title': data['job_title'],
+                'resume_id': resume_id,  # Link to the resume we just created
                 'company': data['company'],
-                'job_description': data['job_description'],
+                'job_title': data['job_title'],
                 'job_url': data['job_url'],
-                'resume_id': resume_id,
+                'job_description': data['job_description'],
                 'status': 'new',
                 'created_at': 'now()',
                 'updated_at': 'now()'
