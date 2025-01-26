@@ -3,7 +3,6 @@ import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { Resume, getRecentResumes } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
-import { Loader } from 'lucide-react';
 
 const MyResumes = () => {
   const { user } = useAuth();
@@ -27,16 +26,22 @@ const MyResumes = () => {
     fetchResumes();
   }, []);
 
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">My Resumes</h1>
         
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader className="w-8 h-8 text-indigo-600 animate-spin" />
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
             {error}
           </div>

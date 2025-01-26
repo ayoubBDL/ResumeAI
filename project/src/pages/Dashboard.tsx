@@ -35,7 +35,7 @@ export default function Dashboard() {
 
   const loadRecentResumes = async () => {
     try {
-      const resumes = await getRecentResumes();
+      const resumes = await getRecentResumes(3); // Only fetch 3 most recent resumes
       setRecentResumes(resumes);
     } catch (error) {
       console.error('Error loading resumes:', error);

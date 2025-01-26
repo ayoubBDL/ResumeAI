@@ -152,7 +152,13 @@ export default function SavedJobs() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h3 className="text-lg font-medium text-gray-900">{job.job_title}</h3>
-                        <p className="text-sm text-gray-600">{job.company}</p>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Building2 className="h-4 w-4" />
+                          <span>{job.company}</span>
+                          <span className="text-gray-400">•</span>
+                          <Calendar className="h-4 w-4" />
+                          <span>Added {format(new Date(job.created_at), 'MMM d, yyyy')}</span>
+                        </div>
                       </div>
                       <span className={`px-2 py-1 text-sm rounded-full ${
                         job.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :

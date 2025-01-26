@@ -833,12 +833,19 @@ def get_resumes():
                 "error": "Missing X-User-Id header"
             }), 401
 
+        # Get limit from query params, default to None (all resumes)
+        limit = request.args.get('limit', type=int)
+
         # Fetch resumes from Supabase
-        response = supabase.table('resumes')\
+        query = supabase.table('resumes')\
             .select('*')\
             .eq('user_id', user_id)\
-            .order('created_at', desc=True)\
-            .execute()
+            .order('created_at', desc=True)
+            
+        if limit:
+            query = query.limit(limit)
+
+        response = query.execute()
 
         if not response.data:
             return jsonify([])  # Return empty list if no resumes found
