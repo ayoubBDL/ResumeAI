@@ -9,8 +9,11 @@ import pdfplumber
 from flask import Flask, request, jsonify, make_response, send_file
 from flask_cors import CORS
 from services.linkedin_batch_scraper import LinkedInJobScraper
+from services.linkedin_scraper import LinkedInJobScraper as JobScraper
 from services.supabase_client import supabase
 from reportlab.lib import colors
+from services.pdf_generator import PDFGenerator
+from services.openai_optimizer import OpenAIOptimizer
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -53,179 +56,6 @@ app.config['DEBUG'] = True
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
 
-def clean_text(text):
-    """Clean extracted text by removing extra spaces and formatting"""
-    # Split into lines and clean each line
-    lines = text.splitlines()
-    cleaned_lines = []
-    
-    for line in lines:
-        # Remove multiple spaces and tabs
-        cleaned_line = ' '.join(word for word in line.split() if word)
-        if cleaned_line:
-            cleaned_lines.append(cleaned_line)
-    
-    # Join lines back together
-    return '\n'.join(cleaned_lines)
-
-def extract_text_from_pdf(file_storage):
-    try:
-        print(f"[PDF Extraction] Starting PDF text extraction for file: {file_storage.filename}")
-        
-        # Read the file into a bytes buffer
-        pdf_bytes = io.BytesIO(file_storage.read())
-        print("[PDF Extraction] Successfully read file into buffer")
-        
-        text_content = []
-        # Use pdfplumber for better text extraction
-        with pdfplumber.open(pdf_bytes) as pdf:
-            num_pages = len(pdf.pages)
-            print(f"[PDF Extraction] PDF has {num_pages} pages")
-            
-            for i, page in enumerate(pdf.pages):
-                # Extract text with better formatting
-                page_text = page.extract_text(layout=True)
-                if page_text:
-                    # Clean the text before adding to content
-                    cleaned_text = clean_text(page_text)
-                    text_content.append(cleaned_text)
-                print(f"[PDF Extraction] Extracted {len(page_text) if page_text else 0} characters from page {i+1}")
-        
-        # Join all pages with proper spacing
-        final_text = "\n\n".join(text_content).strip()
-        
-        print(f"[PDF Extraction] Total extracted text length: {len(final_text)} characters")
-        print("[PDF Extraction] Complete extracted text:")
-        print("=" * 80)
-        print(final_text)
-        print("=" * 80)
-        
-        return final_text
-        
-    except Exception as e:
-        print(f"[PDF Extraction ERROR] Error extracting text from PDF: {str(e)}")
-        raise Exception("Failed to extract text from PDF file")
-
-def generate_with_openai(prompt):
-    """Generate optimization suggestions using OpenAI"""
-    try:
-        print("[OpenAI] Sending request to OpenAI API...")
-        
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",  # Using the original model
-            messages=[
-                {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
-
-        CRITICAL - ABSOLUTELY REQUIRED RULES:
-        1. JOB MATCHING (HIGHEST PRIORITY):
-           ‼️ Analyze the job description thoroughly
-           ‼️ Identify key requirements, skills, and qualifications
-           ‼️ Reorganize and emphasize resume content to match job requirements
-           ‼️ Use similar terminology as the job description
-           ‼️ Highlight experiences that directly relate to job requirements
-           ‼️ Ensure technical skills match what's asked in the job
-
-        PART 1: OPTIMIZED RESUME
-        =======================
-        Create a clean, professional resume with these sections:
-        1. Contact Information (keep original details)
-        2. Professional Summary (concise, impactful)
-        3. Technical Skills (prioritize job-relevant skills)
-        4. Professional Experience (emphasize relevant achievements)
-        5. Education (keep as in original)
-
-        FORMAT RULES:
-        - NO headers like "ATS-FRIENDLY" or separator lines
-        - Clean, minimal formatting
-        - Use bullet points (•) for experience and skills
-        - Consistent spacing
-        - No tables or columns
-
-        PART 2: IMPROVEMENT ANALYSIS
-        ===========================
-        Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
-
-        [SECTION:IMPROVEMENTS]
-        • Reorganized Content
-        - Restructured sections for better flow
-        - Enhanced readability and scannability
-        
-        • Enhanced Technical Skills
-        - Added relevant technologies from job description
-        - Prioritized key required skills
-        
-        • Strengthened Experience
-        - Added quantifiable metrics
-        - Highlighted leadership roles
-        
-        • Optimized Keywords
-        - Incorporated job-specific terms
-        - Added industry-standard variations
-        [/SECTION]
-
-        [SECTION:INTERVIEW]
-        • Technical Topics
-        - Key areas from job requirements
-        - System design considerations
-        
-        • Project Highlights
-        - Prepare STAR stories for key projects
-        - Focus on technical challenges solved
-        
-        • Key Questions
-        - Prepare for role-specific scenarios
-        - Technical implementation details
-        
-        • Discussion Points
-        - Team collaboration examples
-        - Code quality practices
-        [/SECTION]
-
-        [SECTION:NEXTSTEPS]
-        • Skills Development
-        - Identify skill gaps
-        - Learning resources
-        
-        • Certifications
-        - Relevant technical certifications
-        - Industry-specific training
-        
-        • Portfolio Enhancement
-        - Project suggestions
-        - Skills to demonstrate
-        
-        • Industry Knowledge
-        - Technology trends
-        - Professional networking
-        [/SECTION]
-
-        FINAL CHECK - VERIFY:
-        1. Resume is SPECIFICALLY TAILORED to job description
-        2. ALL experience is included but PRIORITIZED for relevance
-        3. Skills and technologies MATCH job requirements
-        4. NO fictional or assumed information
-        5. Original contact details preserved
-        6. Analysis sections use EXACT format with [SECTION:NAME] markers
-
-        ‼️ IMPORTANT: Show the COMPLETE response with both parts clearly separated.
-        """},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=2000
-        )
-        
-        print("[OpenAI] Successfully received response")
-        print("\n[OpenAI] Response content:")
-        print("=" * 80)
-        print(response.choices[0].message.content)
-        print("=" * 80)
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        print(f"[OpenAI ERROR] Error generating optimization suggestions: {str(e)}")
-        raise
 
 def generate_with_ollama(prompt):
     """Generate optimization suggestions using Ollama"""
@@ -243,214 +73,6 @@ def generate_with_ollama(prompt):
     except Exception as e:
         print(f"[Ollama ERROR] Error generating suggestions: {str(e)}")
         raise
-
-def create_pdf_from_text(text):
-    """Convert text to PDF using ReportLab with enhanced formatting"""
-    try:
-        # Create a BytesIO buffer instead of a temporary file
-        buffer = io.BytesIO()
-        
-        # Set up the document with proper margins
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=letter,
-            leftMargin=0.75*inch,
-            rightMargin=0.75*inch,
-            topMargin=0.75*inch,
-            bottomMargin=0.75*inch
-        )
-        
-        # Create custom styles
-        styles = getSampleStyleSheet()
-        
-        # Name style
-        styles.add(ParagraphStyle(
-            name='Name',
-            parent=styles['Heading1'],
-            fontSize=18,
-            spaceAfter=12,
-            textColor=colors.HexColor('#2C3E50'),
-            fontName='Helvetica-Bold'
-        ))
-        
-        # Section heading style
-        styles.add(ParagraphStyle(
-            name='SectionHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            spaceBefore=12,
-            spaceAfter=8,
-            textColor=colors.HexColor('#2C3E50'),
-            fontName='Helvetica-Bold'
-        ))
-        
-        # Normal text style
-        styles.add(ParagraphStyle(
-            name='NormalText',
-            parent=styles['Normal'],
-            fontSize=11,
-            spaceAfter=6,
-            fontName='Helvetica',
-            leading=14
-        ))
-        
-        # Contact info style
-        styles.add(ParagraphStyle(
-            name='ContactInfo',
-            parent=styles['Normal'],
-            fontSize=11,
-            spaceAfter=2,
-            fontName='Helvetica',
-            textColor=colors.HexColor('#34495E')
-        ))
-        
-        # Parse the text and build the document
-        story = []
-        lines = text.split('\n')
-        current_section = []
-        in_contact_section = False
-        skip_next = False
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Skip ATS header and separator lines
-            if "ATS-FRIENDLY" in line or "=" * 10 in line:
-                continue
-            
-            # Remove markers and clean up the text
-            line = re.sub(r'^PART \d+:', '', line)  # Remove "PART X:" headers
-            line = re.sub(r'\*\*|\#\#', '', line)   # Remove ** and ## markers
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Handle different sections
-            if "PROFESSIONAL SUMMARY" in line.upper():
-                story.append(Paragraph("Summary", styles['SectionHeading']))
-            elif "PROFESSIONAL EXPERIENCE" in line.upper():
-                story.append(Paragraph("Experience", styles['SectionHeading']))
-            elif "EDUCATION" in line.upper():
-                story.append(Paragraph("Education", styles['SectionHeading']))
-            elif "SKILLS" in line.upper():
-                story.append(Paragraph("Skills", styles['SectionHeading']))
-            elif "CONTACT SECTION" in line.upper():
-                continue  # Skip this header
-            elif line.startswith('[LinkedIn]'):
-                # Clean up LinkedIn URL
-                url = re.search(r'\((.*?)\)', line).group(1)
-                story.append(Paragraph(f'LinkedIn: {url}', styles['ContactInfo']))
-            elif ':' in line and not in_contact_section:
-                # Handle contact info
-                label, value = line.split(':', 1)
-                story.append(Paragraph(
-                    f'{label.strip()}: {value.strip()}',
-                    styles['ContactInfo']
-                ))
-            elif line.startswith('•') or line.startswith('-'):
-                # Add bullet point
-                current_section.append(line[1:].strip())
-            else:
-                # Add normal paragraph
-                if current_section:
-                    # Add any collected bullet points before adding new paragraph
-                    story.append(ListFlowable(
-                        [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
-                        bulletType='bullet',
-                        leftIndent=20,
-                        spaceBefore=4,
-                        spaceAfter=4
-                    ))
-                    current_section = []
-                
-                # Check if this is the name (first non-header line)
-                if not story:
-                    story.append(Paragraph(line, styles['Name']))
-                else:
-                    story.append(Paragraph(line, styles['NormalText']))
-        
-        # Add any remaining bullet points
-        if current_section:
-            story.append(ListFlowable(
-                [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
-                bulletType='bullet',
-                leftIndent=20,
-                spaceBefore=4,
-                spaceAfter=4
-            ))
-        
-        # Build PDF into the buffer
-        doc.build(story)
-        
-        # Get the PDF bytes
-        pdf_bytes = buffer.getvalue()
-        buffer.close()
-        
-        return pdf_bytes
-        
-    except Exception as e:
-        print(f"Error creating PDF: {str(e)}")
-        raise
-
-def extract_job_details(job_url):
-    """Extract job details from LinkedIn job URL"""
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(job_url, headers=headers)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Extract job title
-        job_title = soup.find('h1', {'class': 'top-card-layout__title'})
-        job_title = job_title.text.strip() if job_title else ''
-        
-        # Extract company
-        company = soup.find('a', {'class': 'topcard__org-name-link'})
-        company = company.text.strip() if company else ''
-        
-        # Extract job description
-        job_description = soup.find('div', {'class': 'show-more-less-html__markup'})
-        job_description = job_description.text.strip() if job_description else ''
-        
-        return {
-            'job_title': job_title,
-            'company': company,
-            'job_description': job_description
-        }
-    except Exception as e:
-        print(f"Error extracting job details: {e}")
-        return None
-
-
-def split_ai_response(response):
-    """Split OpenAI response into resume and analysis parts"""
-    # Find all sections using regex
-    sections = re.split(r'\[SECTION:\s*([^\]]+)\]', response)
-    
-    if len(sections) > 1:
-        # First part is the resume content
-        resume_content = sections[0].strip()
-        
-        # Combine all sections into analysis
-        analysis_parts = []
-        for i in range(1, len(sections), 2):
-            if i + 1 < len(sections):
-                section_name = sections[i].strip()
-                section_content = sections[i + 1].strip()
-                analysis_parts.append(f"[{section_name}]\n{section_content}")
-        
-        analysis = "\n\n".join(analysis_parts)
-    else:
-        # If no sections found, treat everything as resume content
-        resume_content = response.strip()
-        analysis = ""
-    
-    return resume_content, analysis
 
 @app.route('/')
 def home():
@@ -493,7 +115,7 @@ def get_job_details():
                 "error": "Missing job_url in request body"
             }), 400
 
-        scraper = LinkedInJobScraper()
+        scraper = JobScraper()
         job_details = scraper.get_job_details(data['job_url'])
 
         if job_details is None:
@@ -553,7 +175,7 @@ def scrape_job_url():
                 "error": "Missing job_url in request body"
             }), 400
 
-        scraper = LinkedInJobScraper()
+        scraper = JobScraper()
         job_details = scraper.scrape_job_by_url(data['job_url'])
 
         if job_details is None:
@@ -585,7 +207,7 @@ def search_similar_jobs():
             }), 400
 
         max_jobs = data.get('max_jobs', 25)
-        scraper = LinkedInJobScraper()
+        scraper = JobScraper()
         similar_jobs = scraper.search_similar_jobs(data['job_url'], max_jobs)
 
         return jsonify({
@@ -625,64 +247,36 @@ def optimize_resume():
         company = None
         job_description = None
         
+        print("[OpenAI] JOB DESCR...job_url :", job_url)
         if job_url and 'linkedin.com' in job_url:
             try:
-                job_details = extract_job_details(job_url)
+                scraper = JobScraper()
+                job_details = scraper.extract_job_details(job_url)
                 if job_details:
                     job_title = job_details.get('job_title')
                     company = job_details.get('company')
                     job_description = job_details.get('job_description')
+
             except Exception as e:
                 print(f"Error extracting job details: {str(e)}")
                 # Continue without job details if extraction fails
 
         # Extract text from PDF
-        resume_text = extract_text_from_pdf(resume_file)
+        pdf_generator = PDFGenerator()
+        resume_text = pdf_generator.extract_text_from_pdf(resume_file)
         if not resume_text:
             return jsonify({'error': 'Failed to extract text from PDF'}), 400
 
         # Get optimization suggestions
         try:
-            optimization_prompt = f"""
-            Please optimize this resume and provide improvement suggestions. Format your response in clear sections as follows:
-
-            1. First, provide the optimized resume content with proper formatting.
-
-            2. Then add the following sections, each starting with its section marker:
-
-            [SECTION: IMPROVEMENTS]
-            List specific improvements made to the resume and why they enhance it.
-
-            [SECTION: INTERVIEW]
-            Provide preparation tips for interviews based on this resume.
-
-            [SECTION: NEXTSTEPS]
-            Suggest next steps for career development and resume enhancement.
-            """
-            
-            if job_title and company:
-                optimization_prompt += f" Optimize specifically for the position of {job_title} at {company}."
-            
-            optimization_prompt += f"""
-            
-            Original Resume:
-            {resume_text}
-            """
-            
-            if job_description:
-                optimization_prompt += f"""
-                
-                Job Description:
-                {job_description}
-                """
-            
-            optimization_result = generate_with_openai(optimization_prompt)
+            openai_optimizer = OpenAIOptimizer()
+            optimization_result = openai_optimizer.generate_with_openai( job_title, company, resume_text, job_description)
             
             # Split the result into resume content and analysis
-            resume_content, analysis = split_ai_response(optimization_result)
+            resume_content, analysis = openai_optimizer.split_ai_response(optimization_result)
             
             # Create PDF from optimized resume content only
-            pdf_data = create_pdf_from_text(resume_content)
+            pdf_data = pdf_generator.create_pdf_from_text(resume_content)
             
             # Convert PDF data to base64 for response
             pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
@@ -899,8 +493,8 @@ def download_resume(resume_id):
             return jsonify({"error": "Invalid file URL format"}), 500
 
         # Generate a fresh signed URL
-        signed_url_response = supabase.storage\
-            .from_('resumes')\
+        signed_url_response = supabase.storage \
+            .from_('resumes') \
             .create_signed_url(file_path, 300)  # URL valid for 5 minutes
 
         if not signed_url_response or 'signedURL' not in signed_url_response:
@@ -1293,19 +887,6 @@ def main():
     print(f"- Port: {port}")
     print(f"- Debug Mode: {debug}")
     print(f"- Hot Reloading: Enabled")
-    
-    print("\nAvailable Endpoints:")
-    print("- GET / - API information")
-    print("- GET /health - Health check")
-    print("- POST /get-job-details - Get job details from LinkedIn")
-    print("- POST /optimize - Optimize resume")
-    print("- GET /api/resumes - Get user's resumes")
-    print("- GET /api/resumes/<id>/download - Download resume")
-    print("- DELETE /api/resumes/<id> - Delete resume")
-    print("- GET /job/<job_id> - Get job details by ID")
-    print("- GET /api/jobs - Get user's jobs")
-    print("- POST /api/jobs - Create new job application")
-    print("- PUT /api/jobs/<job_id>/status - Update job application status")
     
     # Run the application with hot reloading
     app.run(

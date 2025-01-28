@@ -4,6 +4,7 @@ import os
 from typing import Dict
 from dotenv import load_dotenv
 import sys
+from bs4 import BeautifulSoup
 
 def log(msg):
     print(msg, file=sys.stderr, flush=True)
@@ -28,7 +29,39 @@ class LinkedInJobScraper:
         log(f"Extracted job ID: {job_id}")
         return job_id
 
-    def get_job_details(self, url: str) -> Dict:
+    def extract_job_details(self, job_url):
+        """Extract job details from LinkedIn job URL"""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(job_url, headers=headers)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract job title
+            job_title = soup.find('h1', {'class': 'top-card-layout__title'})
+            job_title = job_title.text.strip() if job_title else ''
+            
+            # Extract company
+            company = soup.find('a', {'class': 'topcard__org-name-link'})
+            company = company.text.strip() if company else ''
+            
+            # Extract job description
+            job_description = soup.find('div', {'class': 'show-more-less-html__markup'})
+            job_description = job_description.text.strip() if job_description else ''
+            
+            return {
+                'job_title': job_title,
+                'company': company,
+                'job_description': job_description
+            }
+        except Exception as e:
+            print(f"Error extracting job details: {e}")
+            return None
+
+    def get_job_details(self, url):
         """Get job details using LinkedIn API"""
         try:
             log(f"\n=== Getting job details for URL: {url} ===")
