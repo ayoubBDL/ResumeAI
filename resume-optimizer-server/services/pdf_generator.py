@@ -8,6 +8,7 @@ import pdfplumber
 import uuid
 import io
 import re
+from datetime import datetime
 
 class PDFGenerator:
     def __init__(self):
@@ -294,3 +295,57 @@ class PDFGenerator:
 
         except Exception as e:
             raise Exception(f"Failed to generate PDF: {str(e)}")
+
+    def create_cover_letter_pdf(self, text: str) -> bytes:
+        """Create a PDF from cover letter text with proper formatting"""
+        try:
+            # Create a BytesIO buffer
+            buffer = io.BytesIO()
+            
+            # Set up the document with proper margins for a cover letter
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=letter,
+                leftMargin=1*inch,  # Standard business letter margins
+                rightMargin=1*inch,
+                topMargin=1*inch,
+                bottomMargin=1*inch
+            )
+            
+            # Create styles
+            styles = getSampleStyleSheet()
+            
+            # Normal text style
+            normal_style = ParagraphStyle(
+                'CoverLetterBody',
+                parent=styles['Normal'],
+                fontSize=12,
+                fontName='Helvetica',
+                leading=16,  # Line spacing
+                spaceBefore=12,
+                spaceAfter=12
+            )
+            
+            # Build the document
+            story = []
+            
+            # Split text into paragraphs and add them
+            paragraphs = text.strip().split('\n\n')
+            for paragraph in paragraphs:
+                if paragraph.strip():
+                    # Replace single newlines with spaces, keep paragraph breaks
+                    cleaned_paragraph = paragraph.replace('\n', ' ').strip()
+                    story.append(Paragraph(cleaned_paragraph, normal_style))
+            
+            # Build PDF
+            doc.build(story)
+            
+            # Get PDF data
+            pdf_data = buffer.getvalue()
+            buffer.close()
+            
+            return pdf_data
+            
+        except Exception as e:
+            print(f"Error creating cover letter PDF: {str(e)}")
+            raise

@@ -190,6 +190,26 @@ export const getResumeDownloadUrl = async (resumeId: string, jobTitle?: string) 
   }
 };
 
+// Get cover letter download URL and content
+export const downloadCoverLetter = async (resumeId: string): Promise<Blob> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${API_URL}/api/resumes/${resumeId}/cover-letter/download`, {
+    headers: {
+      'X-User-Id': session.user.id
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to download cover letter');
+  }
+
+  return await response.blob();
+};
+
 // Helper function to convert base64 to Blob
 function base64ToBlob(base64: string, type: string): Blob {
   const byteCharacters = atob(base64);
@@ -310,4 +330,25 @@ export const updateJobApplicationStatus = async (jobId: string, status: JobAppli
   }
 
   return await response.json();
+};
+
+// Delete job application
+export const deleteJobApplication = async (jobId: string): Promise<void> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${API_URL}/api/jobs/${jobId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': session.user.id
+    }
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Failed to delete job application');
+  }
 };

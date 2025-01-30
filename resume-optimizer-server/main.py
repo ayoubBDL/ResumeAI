@@ -24,6 +24,9 @@ import time
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
 import datetime
+import logging
+from flask import Flask, request, jsonify, make_response, send_file
+from flask_cors import CORS
 
 # Load environment variables
 load_dotenv()
@@ -55,7 +58,6 @@ CORS(app, resources={
 app.config['DEBUG'] = True
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
-
 
 def generate_with_ollama(prompt):
     """Generate optimization suggestions using Ollama"""
@@ -274,6 +276,8 @@ def optimize_resume():
             
             # Split the result into resume content and analysis
             resume_content, analysis = openai_optimizer.split_ai_response(optimization_result)
+
+            cover_letter = openai_optimizer.generate_cover_letter(resume_text, job_description, job_title, company)
             
             # Create PDF from optimized resume content only
             pdf_data = pdf_generator.create_pdf_from_text(resume_content)
@@ -336,6 +340,7 @@ def optimize_resume():
                     'job_url': job_url,
                     'optimized_pdf_url': signed_url,
                     'analysis': analysis,  # Store only the analysis part
+                    'cover_letter': cover_letter,
                     'status': 'completed'
                 }
                 
@@ -407,6 +412,58 @@ def optimize_resume():
     except Exception as e:
         print(f"Error processing request: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/resumes/<resume_id>/cover-letter/download', methods=['GET', 'OPTIONS'])
+def download_cover_letter(resume_id):
+    """Generate and download cover letter PDF from stored content"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        # Get the cover letter content from database
+        response = supabase.table('resumes')\
+            .select('cover_letter, title')\
+            .eq('id', resume_id)\
+            .eq('user_id', user_id)\
+            .execute()
+
+        if not response.data:
+            return jsonify({"error": "Resume not found or not authorized"}), 404
+
+        cover_letter = response.data[0].get('cover_letter')
+        if not cover_letter:
+            return jsonify({"error": "Cover letter not found"}), 404
+
+        # Generate PDF from cover letter content
+        pdf_generator = PDFGenerator()
+        pdf_data = pdf_generator.create_cover_letter_pdf(cover_letter)
+
+        # Create response with PDF file
+        filename = f"cover_letter_{response.data[0].get('title', 'document')}"
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
+        return response
+
+    except Exception as e:
+        print(f"Error generating cover letter PDF: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 @app.route('/api/resumes', methods=['GET', 'OPTIONS'])
 def get_resumes():
@@ -851,6 +908,37 @@ def update_job_status(job_id):
 
     except Exception as e:
         print(f"Error updating job status: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route("/api/jobs/<job_id>", methods=["DELETE"])
+def delete_job(job_id):
+    try:
+        # Get user_id from header
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized"
+            }), 401
+
+        # Delete the job application from Supabase
+        response = supabase.table('job_applications').delete().eq('id', job_id).eq('user_id', user_id).execute()
+        
+        if not response.data:
+            return jsonify({
+                "success": False,
+                "error": "Job application not found or unauthorized"
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "message": "Job application deleted successfully"
+        })
+    except Exception as e:
+        logger.error(f"Error deleting job application: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)

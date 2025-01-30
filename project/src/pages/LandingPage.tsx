@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Zap, DollarSign, Upload, Linkedin, Clock, Target, CheckCircle, ArrowRight, Menu } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 export default function LandingPage() {
   return (
@@ -10,8 +11,11 @@ export default function LandingPage() {
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex-shrink-0 flex items-center gap-2">
-              <Zap className="w-6 h-6 text-indigo-600" />
-              <span className="text-2xl font-bold text-indigo-600">ResumeAI</span>
+              <img
+                className="h-[100px] w-[100px] object-contain"
+                src={logo}
+                alt="ResumeAI Logo"
+              />
             </div>
             <div className="hidden sm:flex sm:space-x-8">
               <a href="#features" className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Features</a>
@@ -33,25 +37,30 @@ export default function LandingPage() {
       <div className="relative pt-16">
         <div className="absolute inset-0">
           <img 
-            src="https://images.unsplash.com/photo-1522071820081-009f0129c71c"
-            alt="Background"
-            className="w-full h-full object-cover opacity-10"
+            src="https://images.unsplash.com/photo-1497032628192-86f99bcd76bc"
+            alt="Professional workspace"
+            className="w-full h-full object-cover opacity-65"
           />
-          <div className="absolute inset-0 bg-gray-900/20 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/95 via-white/90 to-gray-50/95 mix-blend-overlay" />
         </div>
         <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-900 sm:text-5xl lg:text-6xl">
-              Land Your Dream Job with an
-              <span className="text-indigo-600"> AI-Powered</span> Resume
+            <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
+              Land Your Dream Job with an{' '}
+              <span className="text-indigo-600">AI-Powered</span>
+              <br />
+              <span className="text-gray-900">Resume</span>
             </h1>
-            <p className="mt-6 text-xl text-gray-500 max-w-3xl mx-auto">
-              Transform your resume into a perfectly tailored match for any job in seconds.
-              Upload once, customize for every application.
+            <p className="mt-6 max-w-2xl mx-auto text-lg text-gray-600">
+              Transform your resume into a perfectly tailored match for any job in seconds. Upload once, customize for every application.
             </p>
             <div className="mt-10">
-              <Link to="/signup" className="inline-flex items-center px-8 py-4 border border-transparent text-lg font-medium rounded-full text-white bg-indigo-600 hover:bg-indigo-700">
-                Get Started Free <ArrowRight className="ml-2 w-5 h-5" />
+              <Link
+                to="/signup"
+                className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:text-lg md:px-10 transition-all duration-200 hover:shadow-lg"
+              >
+                Get Started Free{' '}
+                <ArrowRight className="ml-2 -mr-1 w-5 h-5" aria-hidden="true" />
               </Link>
             </div>
           </div>
@@ -62,62 +71,131 @@ export default function LandingPage() {
       <section className="bg-white py-20" id="how-it-works">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-4 gap-8 max-w-6xl mx-auto">
             <div className="text-center p-6">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Upload className="w-8 h-8 text-indigo-600" />
+              <div className="relative">
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                  <Upload className="w-8 h-8 text-indigo-600" />
+                </div>
+                <div className="absolute top-1/2 left-full hidden md:block w-full border-t-2 border-dashed border-indigo-200"></div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Upload Resume</h3>
-              <p className="text-gray-600">Simply upload your existing resume in any format</p>
+              <h3 className="text-xl font-semibold mt-6 mb-3">1. Upload Resume</h3>
+              <p className="text-gray-600">Upload your existing resume in any format (PDF, Word, or Text). Our AI will analyze your experience and skills.</p>
             </div>
+
             <div className="text-center p-6">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Linkedin className="w-8 h-8 text-indigo-600" />
+              <div className="relative">
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                  <Linkedin className="w-8 h-8 text-indigo-600" />
+                </div>
+                <div className="absolute top-1/2 left-full hidden md:block w-full border-t-2 border-dashed border-indigo-200"></div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Add Job Link</h3>
-              <p className="text-gray-600">Paste the LinkedIn job posting URL you're targeting</p>
+              <h3 className="text-xl font-semibold mt-6 mb-3">2. Add Job Details</h3>
+              <p className="text-gray-600">Paste the job URL or description. We support LinkedIn, Indeed, and other major job boards.</p>
             </div>
+
             <div className="text-center p-6">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-8 h-8 text-indigo-600" />
+              <div className="relative">
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                  <Zap className="w-8 h-8 text-indigo-600" />
+                </div>
+                <div className="absolute top-1/2 left-full hidden md:block w-full border-t-2 border-dashed border-indigo-200"></div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Get Customized</h3>
-              <p className="text-gray-600">Receive your perfectly tailored resume in seconds</p>
+              <h3 className="text-xl font-semibold mt-6 mb-3">3. Get Optimized</h3>
+              <p className="text-gray-600">Our AI tailors your resume to match the job perfectly, optimizing keywords and skills.</p>
+            </div>
+
+            <div className="text-center p-6">
+              <div className="relative">
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto">
+                  <Target className="w-8 h-8 text-indigo-600" />
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold mt-6 mb-3">4. Track & Apply</h3>
+              <p className="text-gray-600">Download your optimized resume and cover letter. Track your application status all in one place.</p>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <div id="features" className="py-24 bg-white">
+      <div id="features" className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="lg:text-center">
             <h2 className="text-base text-indigo-600 font-semibold tracking-wide uppercase">Features</h2>
             <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-              Everything you need to land your next job
+              Everything you need to land your dream job
             </p>
           </div>
 
           <div className="mt-20">
             <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
               <div className="pt-6">
-                <div className="flow-root bg-gray-50 rounded-lg px-6 pb-8">
+                <div className="flow-root bg-white rounded-lg px-6 pb-8">
                   <div className="-mt-6">
                     <div>
                       <span className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
                         <FileText className="h-6 w-6 text-white" />
                       </span>
                     </div>
-                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">AI-Powered Optimization</h3>
+                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Smart Analysis</h3>
                     <p className="mt-5 text-base text-gray-500">
-                      Our AI analyzes job descriptions and optimizes your resume to match the requirements perfectly.
+                      Our AI analyzes both your resume and job descriptions to identify key requirements and skills that need highlighting.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="pt-6">
-                <div className="flow-root bg-gray-50 rounded-lg px-6 pb-8">
+                <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                  <div className="-mt-6">
+                    <div>
+                      <span className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
+                        <Target className="h-6 w-6 text-white" />
+                      </span>
+                    </div>
+                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Job Application Tracking</h3>
+                    <p className="mt-5 text-base text-gray-500">
+                      Keep track of all your job applications in one place. Monitor status, save job posts, and manage your progress.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                  <div className="-mt-6">
+                    <div>
+                      <span className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
+                        <Clock className="h-6 w-6 text-white" />
+                      </span>
+                    </div>
+                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Application Status</h3>
+                    <p className="mt-5 text-base text-gray-500">
+                      Track your applications from pending to interviewing. Get organized with status updates and never miss an opportunity.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <div className="flow-root bg-white rounded-lg px-6 pb-8">
+                  <div className="-mt-6">
+                    <div>
+                      <span className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
+                        <FileText className="h-6 w-6 text-white" />
+                      </span>
+                    </div>
+                    <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Cover Letter Generation</h3>
+                    <p className="mt-5 text-base text-gray-500">
+                      Generate tailored cover letters for each job application. Our AI helps you craft compelling cover letters that complement your resume.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <div className="flow-root bg-white rounded-lg px-6 pb-8">
                   <div className="-mt-6">
                     <div>
                       <span className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
@@ -126,14 +204,14 @@ export default function LandingPage() {
                     </div>
                     <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Instant Results</h3>
                     <p className="mt-5 text-base text-gray-500">
-                      Get your tailored resume in seconds, not hours. Save time and apply to more jobs.
+                      Get your tailored resume and cover letter in seconds. Real-time optimization feedback helps you improve your application instantly.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="pt-6">
-                <div className="flow-root bg-gray-50 rounded-lg px-6 pb-8">
+                <div className="flow-root bg-white rounded-lg px-6 pb-8">
                   <div className="-mt-6">
                     <div>
                       <span className="inline-flex items-center justify-center p-3 bg-indigo-500 rounded-md shadow-lg">
@@ -142,7 +220,7 @@ export default function LandingPage() {
                     </div>
                     <h3 className="mt-8 text-lg font-medium text-gray-900 tracking-tight">Affordable Plans</h3>
                     <p className="mt-5 text-base text-gray-500">
-                      Start with 2 free tries, then choose a plan that fits your needs. No hidden fees.
+                      Start with 2 free tries, then choose a plan that fits your needs. No hidden fees, cancel anytime.
                     </p>
                   </div>
                 </div>
@@ -334,7 +412,7 @@ export default function LandingPage() {
             <a href="#" className="text-gray-400 hover:text-gray-300">
               <span className="sr-only">LinkedIn</span>
               <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
+                <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.761 0 5-2.239 5-5v-14c0-2.761-2.239-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" />
               </svg>
             </a>
           </div>

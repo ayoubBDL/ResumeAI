@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut } from 'lucide-react';
+import logo from '../assets/logo.png';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { signOut } = useAuth();
@@ -24,12 +25,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       {/* Sidebar */}
       <div className="fixed inset-y-0 left-0 w-64 bg-white border-r">
         <div className="flex flex-col h-full">
-          <div className="flex items-center h-16 px-4 border-b">
-            <Link to="/dashboard" className="text-xl font-bold text-indigo-600">
-              ResumeAI
+          <div className="flex items-center justify-center h-24 px-4 border-b">
+            <Link to="/dashboard" className="flex items-center">
+              <img
+                src={logo}
+                alt="ResumeAI Logo"
+                className="h-[100px] w-[100px] object-contain"
+              />
             </Link>
           </div>
-          
           <nav className="flex-1 px-4 py-4 space-y-1">
             {navigation.map((item) => {
               const Icon = item.icon;

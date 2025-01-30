@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { getJobApplications, updateJobApplicationStatus, JobApplication, getResumeDownloadUrl } from '../services/api';
+import { getJobApplications, updateJobApplicationStatus, deleteJobApplication, JobApplication, getResumeDownloadUrl, downloadCoverLetter } from '../services/api';
 import { format } from 'date-fns';
-import { Building2, Calendar, ExternalLink, Search, BookOpen, Download } from 'lucide-react';
+import { Building2, Calendar, ExternalLink, Search, BookOpen, Download, FileText, Trash2 } from 'lucide-react';
 import AnalysisModal from '../components/AnalysisModal';
+import ConfirmModal from '../components/ConfirmModal';
+import { useToast } from '../context/ToastContext';
 
 export default function SavedJobs() {
   const [isLoading, setIsLoading] = useState(true);
@@ -12,16 +14,24 @@ export default function SavedJobs() {
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingCoverLetter, setIsDownloadingCoverLetter] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   useEffect(() => {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout;
 
     const fetchJobs = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        setError('User not authenticated');
+        setIsLoading(false);
+        return;
+      }
       
       try {
         setIsLoading(true);
@@ -102,6 +112,54 @@ export default function SavedJobs() {
     }
   };
 
+  const handleCoverLetterDownload = async (resumeId: string, jobTitle: string) => {
+    try {
+      setIsDownloadingCoverLetter(true);
+      setError(null);
+      
+      // Get the cover letter PDF blob
+      const pdfBlob = await downloadCoverLetter(resumeId);
+      
+      // Create a download link
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', `cover_letter_${jobTitle || 'document'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading cover letter:', error);
+      setError(error instanceof Error ? error.message : 'Failed to download cover letter');
+    } finally {
+      setIsDownloadingCoverLetter(false);
+    }
+  };
+
+  const handleDeleteJob = async () => {
+    if (!selectedJobId) return;
+    
+    try {
+      await deleteJobApplication(selectedJobId);
+      showToast('Job application deleted successfully', 'success');
+      
+      // Refresh the jobs list
+      if (user?.id) {
+        const updatedJobs = await getJobApplications(user.id);
+        setJobs(updatedJobs);
+      }
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to delete job application', 'error');
+    } finally {
+      setSelectedJobId(null);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const filteredJobs = jobs.filter((job) => {
     if (!searchTerm) return true;
     return job.job_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -178,7 +236,7 @@ export default function SavedJobs() {
                       </div>
                     )}
 
-                    {/* Links */}
+                    {/* Links and Actions */}
                     <div className="flex flex-wrap gap-4">
                       {job.job_url && (
                         <a
@@ -193,7 +251,6 @@ export default function SavedJobs() {
                       {job.resume?.analysis && (
                         <button
                           onClick={() => {
-                            console.log('Opening analysis for job:', job);
                             setSelectedAnalysis(job.resume?.analysis || '');
                             setIsAnalysisOpen(true);
                           }}
@@ -207,13 +264,19 @@ export default function SavedJobs() {
                         value={job.status}
                         onChange={async (e) => {
                           try {
+                            if (!user?.id) {
+                              throw new Error('User not authenticated');
+                            }
                             const newStatus = e.target.value as JobApplication['status'];
                             await updateJobApplicationStatus(job.id, newStatus);
                             // Refresh the jobs list
                             const updatedJobs = await getJobApplications(user.id);
                             setJobs(updatedJobs);
+                            showToast('Status updated successfully', 'success');
                           } catch (error) {
                             console.error('Error updating job status:', error);
+                            setError(error instanceof Error ? error.message : 'Failed to update status');
+                            showToast(error instanceof Error ? error.message : 'Failed to update status', 'error');
                           }
                         }}
                         className="mt-1 block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
@@ -225,15 +288,35 @@ export default function SavedJobs() {
                         <option value="rejected">Rejected</option>
                       </select>
                       {job.resume_id && (
-                        <button
-                          onClick={() => handleDownload(job.resume_id!, job.job_title, user?.id || '')}
-                          disabled={isDownloading}
-                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Download className="h-5 w-5 mr-2" />
-                          Download Resume
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleDownload(job.resume_id!, job.job_title, user?.id || '')}
+                            disabled={isDownloading}
+                            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Download className="h-5 w-5 mr-2" />
+                            Download Resume
+                          </button>
+                          <button
+                            onClick={() => handleCoverLetterDownload(job.resume_id!, job.job_title)}
+                            disabled={isDownloadingCoverLetter}
+                            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <FileText className="h-5 w-5 mr-2" />
+                            Download Cover Letter
+                          </button>
+                        </>
                       )}
+                      <button
+                        onClick={() => {
+                          setSelectedJobId(job.id);
+                          setShowDeleteConfirm(true);
+                        }}
+                        className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      >
+                        <Trash2 className="h-5 w-5 mr-2" />
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </li>
@@ -248,6 +331,20 @@ export default function SavedJobs() {
         isOpen={isAnalysisOpen}
         onClose={() => setIsAnalysisOpen(false)}
         analysis={selectedAnalysis}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setSelectedJobId(null);
+        }}
+        onConfirm={handleDeleteJob}
+        title="Delete Job Application"
+        message="Are you sure you want to delete this job application? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </Layout>
   );

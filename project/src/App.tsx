@@ -8,13 +8,18 @@ import Login from './pages/Login.tsx';
 import SignUp from './pages/SignUp.tsx';
 import LandingPage from './pages/LandingPage.tsx';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
-function PrivateRoute({ children }) {
+interface PrivateRouteProps {
+  children: React.ReactNode;
+}
+
+function PrivateRoute({ children }: PrivateRouteProps) {
   const { session } = useAuth();
   return session ? children : <Navigate to="/login" />;
 }
@@ -22,28 +27,30 @@ function PrivateRoute({ children }) {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/dashboard" element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          } />
-          <Route path="/saved-jobs" element={
-            <PrivateRoute>
-              <SavedJobs />
-            </PrivateRoute>
-          } />
-          <Route path="/my-resumes" element={
-            <PrivateRoute>
-              <MyResumes />
-            </PrivateRoute>
-          } />
-        </Routes>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/dashboard" element={
+              <PrivateRoute>
+                <Dashboard />
+              </PrivateRoute>
+            } />
+            <Route path="/saved-jobs" element={
+              <PrivateRoute>
+                <SavedJobs />
+              </PrivateRoute>
+            } />
+            <Route path="/my-resumes" element={
+              <PrivateRoute>
+                <MyResumes />
+              </PrivateRoute>
+            } />
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

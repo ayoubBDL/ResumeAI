@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import { optimizeResume, getRecentResumes, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
+import { useToast } from '../context/ToastContext';
 
 export default function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
@@ -10,7 +11,9 @@ export default function Dashboard() {
   const [uploadStatus, setUploadStatus] = useState('');
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
   const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     loadRecentResumes();
@@ -23,12 +26,22 @@ export default function Dashboard() {
       setProgress(0);
       interval = setInterval(() => {
         setProgress(prev => {
+          const newProgress = prev + Math.random() * 15;
+          // Update progress message based on progress
+          if (newProgress < 30) {
+            setProgressMessage('Analyzing resume and job description...');
+          } else if (newProgress < 60) {
+            setProgressMessage('Generating optimized resume...');
+          } else if (newProgress < 90) {
+            setProgressMessage('Creating personalized cover letter...');
+          }
           if (prev >= 90) return prev; // Cap at 90% until complete
-          return prev + Math.random() * 15;
+          return newProgress;
         });
       }, 500);
     } else {
       setProgress(100);
+      setProgressMessage('');
     }
     return () => clearInterval(interval);
   }, [isUploading]);
@@ -70,11 +83,16 @@ export default function Dashboard() {
       const resume = await optimizeResume(formData);
       resetForm();
       
+      // Show success toast
+      showToast('Resume and cover letter generated successfully! You can find them in your saved jobs.', 'success');
+      
       // Refresh the list of resumes
       loadRecentResumes();
     } catch (error) {
       console.error('Error optimizing resume:', error);
-      setUploadStatus(error instanceof Error ? error.message : 'Failed to optimize resume');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to optimize resume';
+      setUploadStatus(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setIsUploading(false);
     }
@@ -176,13 +194,18 @@ export default function Dashboard() {
             </div>
 
             {isUploading && (
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(Math.round(progress), 100)}%` }}
-                />
-                <div className="text-xs text-gray-500 mt-1 text-center">
-                  {Math.min(Math.round(progress), 100)}% Complete
+              <div className="space-y-2">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(Math.round(progress), 100)}%` }}
+                  />
+                </div>
+                <div className="text-sm text-gray-600 text-center space-y-1">
+                  <div>{progressMessage}</div>
+                  <div className="text-xs text-gray-500">
+                    {Math.min(Math.round(progress), 100)}% Complete
+                  </div>
                 </div>
               </div>
             )}
