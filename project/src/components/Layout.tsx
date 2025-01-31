@@ -1,13 +1,29 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut } from 'lucide-react';
+import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut, Coins } from 'lucide-react';
+import { getUserCredits } from '../services/api';
 import logo from '../assets/logo.png';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    const loadCredits = async () => {
+      if (user?.id) {
+        try {
+          const userCredits = await getUserCredits();
+          setCredits(userCredits);
+        } catch (error) {
+          console.error('Error loading credits:', error);
+        }
+      }
+    };
+    loadCredits();
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -54,7 +70,17 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             })}
           </nav>
 
-          <div className="px-4 py-4 border-t">
+          <div className="px-4 py-4 border-t space-y-2">
+            <div className="flex items-center px-2 py-2 text-gray-600">
+              <Coins className="h-5 w-5 mr-3 text-yellow-500" />
+              <span>
+                {credits === null ? (
+                  "Loading credits..."
+                ) : (
+                  <>{credits} credits remaining</>
+                )}
+              </span>
+            </div>
             <button
               onClick={handleSignOut}
               className="flex items-center w-full px-2 py-2 text-gray-600 rounded-md hover:bg-gray-50"

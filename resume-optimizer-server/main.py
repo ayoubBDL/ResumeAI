@@ -233,6 +233,24 @@ def optimize_resume():
         if not user_id:
             return jsonify({'error': 'User ID is required'}), 401
 
+        # Check user credits first
+        credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
+        
+        if len(credits_response.data) == 0:
+            return jsonify({
+                "error": "No credits found",
+                "message": "Please purchase credits to use the resume optimization service."
+            }), 403
+            
+        credits_remaining = credits_response.data[0]['credits_remaining']
+
+        # Check if user has enough credits
+        if credits_remaining <= 0:
+            return jsonify({
+                "error": "Insufficient credits",
+                "message": "Please purchase more credits to continue using the service."
+            }), 403
+
         # Get the uploaded file and job details
         if 'resume' not in request.files:
             return jsonify({'error': 'No resume file provided'}), 400
@@ -272,7 +290,7 @@ def optimize_resume():
         # Get optimization suggestions
         try:
             openai_optimizer = OpenAIOptimizer()
-            optimization_result = openai_optimizer.generate_with_openai( job_title, company, resume_text, job_description)
+            optimization_result = openai_optimizer.generate_with_openai(job_title, company, resume_text, job_description)
             
             # Split the result into resume content and analysis
             resume_content, analysis = openai_optimizer.split_ai_response(optimization_result)
@@ -388,6 +406,12 @@ def optimize_resume():
                         'has_title': bool(job_title),
                         'has_company': bool(company)
                     })
+
+                # Since optimization was successful, deduct one credit
+                supabase.table('usage_credits').update({
+                    'credits_remaining': credits_remaining - 1,
+                    'updated_at': datetime.datetime.utcnow().isoformat()
+                }).eq('user_id', user_id).execute()
 
                 # Return success response with base64 PDF data and resume details
                 return jsonify({
@@ -943,6 +967,122 @@ def delete_job(job_id):
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route('/api/credits', methods=['GET'])
+def get_user_credits():
+    """Get user's current credit balance"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
+        if len(credits_response.data) == 0:
+            # Create initial credits for user if not exists
+            supabase.table('usage_credits').insert({
+                'user_id': user_id,
+                'credits_remaining': 2,
+                'created_at': datetime.datetime.utcnow().isoformat(),
+                'updated_at': datetime.datetime.utcnow().isoformat()
+            }).execute()
+            return jsonify({"credits": 2})
+
+        return jsonify({
+            "credits": credits_response.data[0]['credits_remaining']
+        })
+
+    except Exception as e:
+        print(f"Error getting user credits: {str(e)}")
+        return jsonify({"error": "Failed to get user credits"}), 500
+
+@app.route('/api/credits/initialize', methods=['POST'])
+def initialize_credits():
+    """Initialize credits for a new user"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        # Check if user already has credits
+        credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
+        if len(credits_response.data) > 0:
+            return jsonify({"error": "Credits already initialized for this user"}), 400
+
+        # Initialize credits for new user
+        supabase.table('usage_credits').insert({
+            'user_id': user_id,
+            'credits_remaining': 2,
+            'created_at': datetime.datetime.utcnow().isoformat(),
+            'updated_at': datetime.datetime.utcnow().isoformat()
+        }).execute()
+
+        return jsonify({
+            "success": True,
+            "message": "Credits initialized successfully",
+            "credits": 2
+        })
+
+    except Exception as e:
+        print(f"Error initializing credits: {str(e)}")
+        return jsonify({"error": "Failed to initialize credits"}), 500
+
+@app.route('/api/credits/purchase', methods=['POST'])
+def purchase_credits():
+    """Purchase credits based on selected plan"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        data = request.get_json()
+        if not data or 'plan' not in data:
+            return jsonify({"error": "Plan type is required"}), 400
+
+        plan = data['plan']
+        credits = 0
+        
+        # Calculate credits based on plan
+        if plan == 'pay_as_you_go':
+            min_credits = 5
+            requested_credits = data.get('credits', min_credits)
+            if requested_credits < min_credits:
+                return jsonify({"error": f"Minimum credit purchase is {min_credits}"}), 400
+            credits = requested_credits
+        elif plan == 'pro':
+            credits = 50  # $29 for 50 credits
+        elif plan == 'annual':
+            credits = 999999  # Using a large number instead of infinity
+        else:
+            return jsonify({"error": "Invalid plan type"}), 400
+
+        # Get current credits
+        credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
+        
+        if len(credits_response.data) == 0:
+            # Create new credits entry
+            supabase.table('usage_credits').insert({
+                'user_id': user_id,
+                'credits_remaining': credits,
+                'created_at': datetime.datetime.utcnow().isoformat(),
+                'updated_at': datetime.datetime.utcnow().isoformat()
+            }).execute()
+        else:
+            # Update existing credits
+            current_credits = credits_response.data[0]['credits_remaining']
+            supabase.table('usage_credits').update({
+                'credits_remaining': current_credits + credits,
+                'updated_at': datetime.datetime.utcnow().isoformat()
+            }).eq('user_id', user_id).execute()
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully purchased {credits} credits",
+            "credits": credits
+        })
+
+    except Exception as e:
+        print(f"Error purchasing credits: {str(e)}")
+        return jsonify({"error": "Failed to purchase credits"}), 500
 
 def validate_environment():
     """Validate required environment variables"""

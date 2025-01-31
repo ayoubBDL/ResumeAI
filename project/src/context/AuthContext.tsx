@@ -22,14 +22,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Check active sessions and subscribe to auth changes
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session?.user || null);
-      setUser(session?.user || null);
+      if (session?.user) {
+        setSession(session.user);
+        setUser(session.user);
+      }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session?.user || null);
-      setUser(session?.user || null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        setSession(session.user);
+        setUser(session.user);
+
+        // Initialize credits for new OAuth users
+        if (_event === 'SIGNED_IN' && session.user.app_metadata?.provider === 'google') {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay to ensure auth is complete
+            const initResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/credits/initialize`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-User-Id': session.user.id
+              }
+            });
+            
+            if (!initResponse.ok) {
+              console.error('Failed to initialize credits for Google user');
+            }
+          } catch (error) {
+            console.error('Error initializing credits for Google user:', error);
+          }
+        }
+      } else {
+        setSession(null);
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -41,6 +68,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
     });
+
+    // If signup was successful, initialize credits through backend
+    if (response.data?.user) {
+      try {
+        const initResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/credits/initialize`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Id': response.data.user.id
+          }
+        });
+        
+        if (!initResponse.ok) {
+          console.error('Failed to initialize credits');
+        }
+      } catch (error) {
+        console.error('Error initializing credits:', error);
+      }
+    }
+
     return response;
   };
 
@@ -56,7 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     });
     

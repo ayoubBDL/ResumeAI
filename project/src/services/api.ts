@@ -39,7 +39,7 @@ export interface OptimizedResume {
 }
 
 // Resume optimization service
-export const optimizeResume = async (formData: FormData): Promise<Resume> => {
+export const optimizeResume = async (formData: FormData): Promise<any> => {
   try {
     // Get the current user and session
     const { data: { session } } = await supabase.auth.getSession();
@@ -58,9 +58,11 @@ export const optimizeResume = async (formData: FormData): Promise<Resume> => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Optimization error:', errorText);
-      throw new Error('Failed to optimize resume');
+      const errorData = await response.json();
+      if (response.status === 403 && errorData.error === 'Insufficient credits') {
+        throw new Error('Insufficient credits. Please purchase more credits to continue using the resume optimization service.');
+      }
+      throw new Error(errorData.error || 'Failed to optimize resume');
     }
 
     const responseData = await response.json();
@@ -350,5 +352,32 @@ export const deleteJobApplication = async (jobId: string): Promise<void> => {
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.detail || 'Failed to delete job application');
+  }
+};
+
+// Get user credits
+export const getUserCredits = async (): Promise<number> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/api/credits`, {
+      method: 'GET',
+      headers: {
+        'X-User-Id': session.user.id,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get user credits');
+    }
+
+    const data = await response.json();
+    return data.credits;
+  } catch (error) {
+    console.error('Error getting user credits:', error);
+    throw error;
   }
 };

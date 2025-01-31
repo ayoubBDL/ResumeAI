@@ -7,6 +7,7 @@ import MyResumes from './pages/MyResumes';
 import Login from './pages/Login.tsx';
 import SignUp from './pages/SignUp.tsx';
 import LandingPage from './pages/LandingPage.tsx';
+import AuthCallback from './pages/AuthCallback.tsx';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 
@@ -33,6 +34,7 @@ function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/dashboard" element={
               <PrivateRoute>
                 <Dashboard />

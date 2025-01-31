@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -8,7 +9,29 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signInWithGoogle } = useAuth();
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const hash = location.hash;
+      if (hash && hash.includes('access_token')) {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          if (session) {
+            navigate('/dashboard');
+          }
+        } catch (error: any) {
+          console.error('Error processing OAuth callback:', error);
+          setError(error.message);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, [location, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { optimizeResume, getRecentResumes, type Resume } from '../services/api';
+import { optimizeResume, getRecentResumes, getUserCredits, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 import { useToast } from '../context/ToastContext';
 
@@ -12,11 +12,24 @@ export default function Dashboard() {
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
     loadRecentResumes();
+    const loadUserCredits = async () => {
+      try {
+        const userCredits = await getUserCredits();
+        // Removed setting credits state
+      } catch (error) {
+        console.error('Error loading user credits:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserCredits();
   }, []);
 
   useEffect(() => {
@@ -242,13 +255,27 @@ export default function Dashboard() {
           </form>
         </div>
 
+        {/* Removed credits display */}
+
         {/* Recent Resumes Section */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold mb-4">Recent Resumes</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {recentResumes.map((resume) => (
-              <ResumeCard key={resume.id} resume={resume} onUpdate={loadRecentResumes} />
-            ))}
+            {recentResumes.length > 0 ? (
+              recentResumes.map((resume) => (
+                <ResumeCard key={resume.id} resume={resume} onUpdate={loadRecentResumes} />
+              ))
+            ) : (
+              <div className="col-span-full text-center py-8">
+                <div className="mx-auto h-12 w-12 text-gray-400">
+                  <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No resumes found</h3>
+                <p className="mt-1 text-sm text-gray-500">Get started by optimizing your first resume!</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
