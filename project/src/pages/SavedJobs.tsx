@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import { getJobApplications, updateJobApplicationStatus, deleteJobApplication, JobApplication, getResumeDownloadUrl, downloadCoverLetter } from '../services/api';
 import { format } from 'date-fns';
@@ -7,8 +6,9 @@ import { Building2, Calendar, ExternalLink, Search, BookOpen, Download, FileText
 import AnalysisModal from '../components/AnalysisModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { useToast } from '../context/ToastContext';
+import Layout from '../components/Layout';
 
-export default function SavedJobs() {
+function SavedJobs() {
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<JobApplication[]>([]);
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
@@ -167,19 +167,9 @@ export default function SavedJobs() {
       job.job_description?.toLowerCase().includes(searchTerm.toLowerCase());
   });
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-semibold text-gray-900">Saved Jobs</h1>
@@ -249,6 +239,7 @@ export default function SavedJobs() {
                             View Job Post <ExternalLink className="ml-2 -mr-0.5 h-4 w-4" />
                           </a>
                         )}
+
                         {job.resume?.analysis && (
                           <button
                             onClick={() => {
@@ -261,6 +252,7 @@ export default function SavedJobs() {
                             View Analysis
                           </button>
                         )}
+
                         <select
                           value={job.status}
                           onChange={async (e) => {
@@ -288,6 +280,7 @@ export default function SavedJobs() {
                           <option value="offered">Offered</option>
                           <option value="rejected">Rejected</option>
                         </select>
+
                         {job.resume_id && (
                           <>
                             <button
@@ -308,6 +301,7 @@ export default function SavedJobs() {
                             </button>
                           </>
                         )}
+
                         <button
                           onClick={() => {
                             setSelectedJobId(job.id);
@@ -359,3 +353,5 @@ export default function SavedJobs() {
     </Layout>
   );
 }
+
+export default SavedJobs;

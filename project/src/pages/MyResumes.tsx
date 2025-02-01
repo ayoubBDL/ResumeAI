@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Resume, getRecentResumes } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 
-const MyResumes = () => {
+export default function MyResumes() {
   const { user } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,8 +29,8 @@ const MyResumes = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+        <div className="flex justify-center items-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </Layout>
     );
@@ -39,8 +39,10 @@ const MyResumes = () => {
   return (
     <Layout>
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">My Resumes</h1>
-        
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">My Resumes</h1>
+        </div>
+
         {error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600">
             {error}
@@ -64,5 +66,3 @@ const MyResumes = () => {
     </Layout>
   );
 };
-
-export default MyResumes;

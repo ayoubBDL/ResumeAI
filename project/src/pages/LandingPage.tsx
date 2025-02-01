@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { FileText, Zap, DollarSign, Upload, Linkedin, Clock, Target, CheckCircle, ArrowRight, Menu } from 'lucide-react';
 import logo from '../assets/logo.png';
 
-export default function LandingPage() {
+function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Header */}
@@ -456,3 +456,5 @@ export default function LandingPage() {
     </div>
   );
 }
+
+export default LandingPage;

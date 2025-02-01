@@ -3,8 +3,9 @@ import Layout from '../components/Layout';
 import { optimizeResume, getRecentResumes, getUserCredits, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 import { useToast } from '../context/ToastContext';
+import {CreditAlert} from '../components/CreditAlert';
 
-export default function Dashboard() {
+function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
   const [jobUrl, setJobUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [creditError, setCreditError] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
@@ -87,6 +89,18 @@ export default function Dashboard() {
       setIsUploading(true);
       setUploadStatus('');  // Clear any previous status
 
+      // Check credits before optimization
+      const userCredits = await getUserCredits();
+      if (userCredits === 0) {
+        setCreditError({
+          error: 'Insufficient Credits', 
+          message: 'You have no credits left to optimize your resume.', 
+          action: 'purchase_required'
+        });
+        setIsUploading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('resume', file);
       if (jobUrl) {
@@ -97,15 +111,14 @@ export default function Dashboard() {
       resetForm();
       
       // Show success toast
-      showToast('Resume and cover letter generated successfully! You can find them in your saved jobs.', 'success');
+      showToast('Resume optimized successfully!', 'success');
       
-      // Refresh the list of resumes
-      loadRecentResumes();
+      // Reload recent resumes
+      await loadRecentResumes();
     } catch (error) {
       console.error('Error optimizing resume:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to optimize resume';
-      setUploadStatus(errorMessage);
-      showToast(errorMessage, 'error');
+      setUploadStatus(error instanceof Error ? error.message : 'An error occurred');
+      showToast('Failed to optimize resume', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -113,7 +126,7 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="container mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h1 className="text-2xl font-bold mb-6">Resume Optimizer</h1>
           
@@ -257,6 +270,15 @@ export default function Dashboard() {
 
         {/* Removed credits display */}
 
+        {creditError && (
+          <CreditAlert
+            error={creditError.error}
+            message={creditError.message}
+            action={creditError.action}
+            onClose={() => setCreditError(null)}
+          />
+        )}
+
         {/* Recent Resumes Section */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold mb-4">Recent Resumes</h2>
@@ -282,3 +304,5 @@ export default function Dashboard() {
     </Layout>
   );
 }
+
+export default Dashboard;

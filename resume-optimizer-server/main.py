@@ -233,24 +233,14 @@ def optimize_resume():
         if not user_id:
             return jsonify({'error': 'User ID is required'}), 401
 
-        # Check user credits first
-        credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
+        # Check credits and subscription
+        has_credits, credits_or_error = check_user_credits(user_id)
+        if not has_credits:
+            return jsonify(credits_or_error), 403
+
+        # Store credits for deduction later if not enterprise user
+        credits_remaining = credits_or_error if isinstance(credits_or_error, int) else None
         
-        if len(credits_response.data) == 0:
-            return jsonify({
-                "error": "No credits found",
-                "message": "Please purchase credits to use the resume optimization service."
-            }), 403
-            
-        credits_remaining = credits_response.data[0]['credits_remaining']
-
-        # Check if user has enough credits
-        if credits_remaining <= 0:
-            return jsonify({
-                "error": "Insufficient credits",
-                "message": "Please purchase more credits to continue using the service."
-            }), 403
-
         # Get the uploaded file and job details
         if 'resume' not in request.files:
             return jsonify({'error': 'No resume file provided'}), 400
@@ -407,12 +397,13 @@ def optimize_resume():
                         'has_company': bool(company)
                     })
 
-                # Since optimization was successful, deduct one credit
-                supabase.table('usage_credits').update({
-                    'credits_remaining': credits_remaining - 1,
-                    'updated_at': datetime.datetime.utcnow().isoformat()
-                }).eq('user_id', user_id).execute()
-
+                # Since optimization was successful, deduct one credit if not enterprise user
+                if credits_remaining is not None:  # Only deduct if user is using credits (not enterprise)
+                    supabase.table('usage_credits').update({
+                        'credits_remaining': credits_remaining - 1,
+                        'updated_at': datetime.datetime.utcnow().isoformat()
+                    }).eq('user_id', user_id).execute()
+                
                 # Return success response with base64 PDF data and resume details
                 return jsonify({
                     'success': True,
@@ -1083,6 +1074,184 @@ def purchase_credits():
     except Exception as e:
         print(f"Error purchasing credits: {str(e)}")
         return jsonify({"error": "Failed to purchase credits"}), 500
+
+@app.route('/api/subscriptions', methods=['GET'])
+def get_subscription():
+    """Get user's current subscription status"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        # Get user's current subscription
+        subscription_response = supabase.table('subscriptions')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .order('created_at', desc=True)\
+            .limit(1)\
+            .execute()
+
+        if not subscription_response.data:
+            return jsonify({
+                "has_subscription": False,
+                "subscription": None
+            })
+
+        return jsonify({
+            "has_subscription": True,
+            "subscription": subscription_response.data[0]
+        })
+
+    except Exception as e:
+        print(f"Error getting subscription: {str(e)}")
+        return jsonify({"error": "Failed to get subscription status"}), 500
+
+@app.route('/api/subscriptions', methods=['POST'])
+def create_subscription():
+    """Create or update user subscription"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        data = request.get_json()
+        if not data or 'plan_type' not in data:
+            return jsonify({"error": "Plan type is required"}), 400
+
+        plan_type = data['plan_type']
+        
+        # Validate plan type
+        valid_plans = ['free', 'pro', 'enterprise']
+        if plan_type not in valid_plans:
+            return jsonify({"error": f"Invalid plan type. Must be one of: {', '.join(valid_plans)}"}), 400
+
+        # Cancel any existing active subscriptions
+        supabase.table('subscriptions')\
+            .update({'status': 'cancelled'})\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .execute()
+
+        # Create new subscription
+        now = datetime.datetime.utcnow()
+        subscription_data = {
+            'user_id': user_id,
+            'plan_type': plan_type,
+            'status': 'active',
+            'current_period_start': now.isoformat(),
+            'current_period_end': (now + datetime.timedelta(days=30)).isoformat(),
+            'created_at': now.isoformat(),
+            'updated_at': now.isoformat()
+        }
+
+        subscription_result = supabase.table('subscriptions')\
+            .insert(subscription_data)\
+            .execute()
+
+        # Update user credits based on plan
+        credits = 0
+        if plan_type == 'free':
+            credits = 2
+        elif plan_type == 'pro':
+            credits = 50
+        elif plan_type == 'enterprise':
+            credits = 999999
+
+        # Update or create credits
+        credits_response = supabase.table('usage_credits').select('*').eq('user_id', user_id).execute()
+        if len(credits_response.data) == 0:
+            supabase.table('usage_credits').insert({
+                'user_id': user_id,
+                'credits_remaining': credits,
+                'created_at': now.isoformat(),
+                'updated_at': now.isoformat()
+            }).execute()
+        else:
+            supabase.table('usage_credits').update({
+                'credits_remaining': credits,
+                'updated_at': now.isoformat()
+            }).eq('user_id', user_id).execute()
+
+        return jsonify({
+            "success": True,
+            "message": f"Successfully subscribed to {plan_type} plan",
+            "subscription": subscription_result.data[0] if subscription_result.data else None,
+            "credits": credits
+        })
+
+    except Exception as e:
+        print(f"Error creating subscription: {str(e)}")
+        return jsonify({"error": "Failed to create subscription"}), 500
+
+@app.route('/api/subscriptions/cancel', methods=['POST'])
+def cancel_subscription():
+    """Cancel user subscription"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        # Cancel active subscription
+        supabase.table('subscriptions')\
+            .update({
+                'status': 'cancelled',
+                'updated_at': datetime.datetime.utcnow().isoformat()
+            })\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .execute()
+
+        return jsonify({
+            "success": True,
+            "message": "Subscription cancelled successfully"
+        })
+
+    except Exception as e:
+        print(f"Error cancelling subscription: {str(e)}")
+        return jsonify({"error": "Failed to cancel subscription"}), 500
+
+def check_user_credits(user_id):
+    """Check if user has credits or active subscription"""
+    try:
+        # Check for active subscription first
+        subscription_response = supabase.table('subscriptions')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .execute()
+
+        if subscription_response.data:
+            subscription = subscription_response.data[0]
+            if subscription['plan_type'] == 'enterprise':
+                return True, None  # Enterprise users have unlimited credits
+            
+            # Check if subscription is expired
+            current_period_end = datetime.datetime.fromisoformat(subscription['current_period_end'].replace('Z', '+00:00'))
+            if current_period_end < datetime.datetime.utcnow():
+                return False, {
+                    "error": "Subscription expired",
+                    "message": "Your subscription has expired. Please renew to continue using the service.",
+                    "action": "renew_subscription",
+                    "redirect_url": "/dashboard/billing"
+                }
+
+        # Check credits for non-enterprise users
+        credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
+        if len(credits_response.data) == 0 or credits_response.data[0]['credits_remaining'] <= 0:
+            return False, {
+                "error": "Insufficient credits",
+                "message": "Your credits have expired. Please purchase more credits or subscribe to continue.",
+                "action": "purchase_required",
+                "redirect_url": "/dashboard/billing",
+                "current_credits": credits_response.data[0]['credits_remaining'] if credits_response.data else 0
+            }
+
+        return True, credits_response.data[0]['credits_remaining']
+
+    except Exception as e:
+        print(f"Error checking user credits: {str(e)}")
+        return False, {"error": "Failed to check credits"}
 
 def validate_environment():
     """Validate required environment variables"""
