@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import Dashboard from './pages/Dashboard';
 import SavedJobs from './pages/SavedJobs';
 import MyResumes from './pages/MyResumes';
@@ -10,6 +11,8 @@ import LandingPage from './pages/LandingPage';
 import AuthCallback from './pages/AuthCallback';
 import Billing from './pages/Billing';
 import Checkout from './pages/Checkout';
+import SuccessPage from './pages/SuccessPage';
+import CancelPage from './pages/CancelPage';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -24,8 +27,12 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, session, loading } = useAuth();
   
+  if (loading) {
+    return <div>Loading...</div>; // Or a loading spinner
+  }
+
   if (!user) {
     return <Navigate to="/login" />;
   }
@@ -35,45 +42,55 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            
-            {/* Protected Routes */}
-            <Route path="/dashboard" element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            } />
-            <Route path="/my-resumes" element={
-              <PrivateRoute>
-                <MyResumes />
-              </PrivateRoute>
-            } />
-            <Route path="/saved-jobs" element={
-              <PrivateRoute>
-                <SavedJobs />
-              </PrivateRoute>
-            } />
-            <Route path="/billing" element={
-              <PrivateRoute>
-                <Billing />
-              </PrivateRoute>
-            } />
-            <Route path="/checkout" element={
-              <PrivateRoute>
-                <Checkout />
-              </PrivateRoute>
-            } />
-          </Routes>
-        </BrowserRouter>
-      </ToastProvider>
-    </AuthProvider>
+    <PayPalScriptProvider
+      options={{
+        clientId: import.meta.env.VITE_PAYPAL_CLIENT_ID || "",
+        vault: true,
+        intent: "capture"
+      }}
+    >
+      <AuthProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/success" element={<SuccessPage />} />
+              <Route path="/cancel" element={<CancelPage />} />
+              
+              {/* Protected Routes */}
+              <Route path="/dashboard" element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              } />
+              <Route path="/my-resumes" element={
+                <PrivateRoute>
+                  <MyResumes />
+                </PrivateRoute>
+              } />
+              <Route path="/saved-jobs" element={
+                <PrivateRoute>
+                  <SavedJobs />
+                </PrivateRoute>
+              } />
+              <Route path="/billing" element={
+                <PrivateRoute>
+                  <Billing />
+                </PrivateRoute>
+              } />
+              <Route path="/checkout" element={
+                <PrivateRoute>
+                  <Checkout />
+                </PrivateRoute>
+              } />
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </AuthProvider>
+    </PayPalScriptProvider>
   );
 }
 

@@ -10,7 +10,14 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, session } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (session) {
+      navigate('/dashboard');
+    }
+  }, [session, navigate]);
 
   // Handle OAuth callback
   useEffect(() => {
@@ -24,7 +31,6 @@ function Login() {
             navigate('/dashboard');
           }
         } catch (error: any) {
-          console.error('Error processing OAuth callback:', error);
           setError(error.message);
         }
       }

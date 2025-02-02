@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, AuthResponse } from '@supabase/supabase-js';
+import { User, AuthResponse, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
 
 interface AuthContextType {
-  session: User | null;
+  session: Session | null;
   loading: boolean;
   signUp: (email: string, password: string) => Promise<AuthResponse>;
   signIn: (email: string, password: string) => Promise<AuthResponse>;
@@ -17,50 +17,66 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Check active sessions and subscribe to auth changes
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setSession(session.user);
-        setUser(session.user);
-      }
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        setSession(session.user);
-        setUser(session.user);
-
-        // Initialize credits for new OAuth users
-        if (_event === 'SIGNED_IN' && session.user.app_metadata?.provider === 'google') {
-          try {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay to ensure auth is complete
-            const initResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/credits/initialize`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': session.user.id
-              }
-            });
-            
-            if (!initResponse.ok) {
-              console.error('Failed to initialize credits for Google user');
-            }
-          } catch (error) {
-            console.error('Error initializing credits for Google user:', error);
-          }
+    // Aggressive session restoration
+    const restoreSession = async () => {
+      try {
+        // First, check Supabase session
+        const { data: supabaseSession } = await supabase.auth.getSession();
+        
+        if (supabaseSession.session) {
+          setSession(supabaseSession.session);
+          setUser(supabaseSession.session.user);
         }
+      } catch (error) {
+        console.error(' Session restoration failed:', error);
+        localStorage.removeItem('supabase_session');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Initial session restoration
+    restoreSession();
+
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      
+      if (session) {
+        localStorage.setItem('supabase_session', JSON.stringify(session));
+        setSession(session);
+        setUser(session.user);
       } else {
+        localStorage.removeItem('supabase_session');
         setSession(null);
         setUser(null);
       }
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Periodic session refresh
+    const refreshInterval = setInterval(async () => {
+      if (session) {
+        try {
+          const { data } = await supabase.auth.refreshSession({ 
+            refresh_token: session.refresh_token 
+          });
+          
+          if (data.session) {
+            setSession(data.session);
+            localStorage.setItem('supabase_session', JSON.stringify(data.session));
+          }
+        } catch (error) {
+          console.error(' Session Refresh Error:', error);
+        }
+      }
+    }, 30 * 60 * 1000); // Refresh every 30 minutes
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(refreshInterval);
+    };
   }, []);
 
   const signUp = async (email: string, password: string) => {
@@ -68,26 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
     });
-
-    // If signup was successful, initialize credits through backend
-    if (response.data?.user) {
-      try {
-        const initResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/credits/initialize`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-User-Id': response.data.user.id
-          }
-        });
-        
-        if (!initResponse.ok) {
-          console.error('Failed to initialize credits');
-        }
-      } catch (error) {
-        console.error('Error initializing credits:', error);
-      }
-    }
-
     return response;
   };
 
@@ -112,13 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     
     if (error) {
-      console.error('Error signing in with Google:', error.message);
+      console.error(' Google Sign In Error:', error.message);
       throw error;
     }
   };
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    localStorage.removeItem('supabase_session');
     if (error) throw error;
   };
 

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { CheckCircle } from 'lucide-react';
 
+
 interface Subscription {
   id: string;
   plan_type: 'free' | 'pro' | 'yearly' | 'payg';
@@ -19,15 +20,8 @@ interface Credits {
 
 const plans = [
   {
-    name: 'Free',
-    price: '$0',
-    credits: 2,
-    features: ['2 Free Credits', 'Basic Resume Optimization', 'Job Description Analysis'],
-    type: 'free'
-  },
-  {
     name: 'Pro Monthly',
-    price: '$29/month',
+    price: '$19/month',
     credits: 50,
     features: [
       '50 Credits Monthly',
@@ -35,11 +29,12 @@ const plans = [
       'Cover Letter Generation',
       'Priority Support'
     ],
-    type: 'pro'
+    type: 'pro',
+    planId: `${import.meta.env.VITE_PAYPAL_MONTHLY_PLAN}` // Replace with actual PayPal plan ID
   },
   {
     name: 'Pro Yearly',
-    price: '$290/year',
+    price: '$209/year',
     credits: 'Unlimited',
     features: [
       'Unlimited Credits Annually',
@@ -48,7 +43,8 @@ const plans = [
       'Priority Support',
       'Best Value Plan'
     ],
-    type: 'yearly'
+    type: 'yearly',
+    planId: `${import.meta.env.VITE_PAYPAL_ANNUALLY_PLAN}` // Replace with actual PayPal plan ID
   },
   {
     name: 'Pay As You Go',

@@ -27,6 +27,7 @@ import datetime
 import logging
 from flask import Flask, request, jsonify, make_response, send_file
 from flask_cors import CORS
+from requests.auth import HTTPBasicAuth
 
 # Load environment variables
 load_dotenv()
@@ -1122,9 +1123,9 @@ def create_subscription():
         plan_type = data['plan_type']
         
         # Validate plan type
-        valid_plans = ['free', 'pro', 'enterprise']
-        if plan_type not in valid_plans:
-            return jsonify({"error": f"Invalid plan type. Must be one of: {', '.join(valid_plans)}"}), 400
+        # valid_plans = ['free', 'pro', 'enterprise']
+        # if plan_type not in valid_plans:
+        #     return jsonify({"error": f"Invalid plan type. Must be one of: {', '.join(valid_plans)}"}), 400
 
         # Cancel any existing active subscriptions
         supabase.table('subscriptions')\
@@ -1264,6 +1265,63 @@ def validate_environment():
             print(f"- {var}")
         return False
     return True
+
+@app.route('/api/create-paypal-subscription', methods=['POST'])
+def create_paypal_subscription():
+    """Create or update user subscription"""
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({"error": "User ID is required"}), 401
+
+        data = request.get_json()
+        print("data:", request)
+        if not data or 'plan_id' not in data:
+            return jsonify({"error": "Plan ID is required"}), 400
+        if not data or 'access_token' not in data:
+            return jsonify({"error": "access_token is required"}), 400
+        plan_id = data['plan_id']
+        access_token = data['access_token']
+        
+        url = 'https://api-m.sandbox.paypal.com/v1/billing/subscriptions'
+
+        if not access_token:
+            return jsonify({"error": "Failed to generate Paypal access token"}), 500
+        
+        print("PAYPAL ACCESS TOKEN GENERATED:",access_token)
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Prefer': 'return=representation',
+            'Authorization': f'Bearer {access_token}',
+            'PayPal-Request-Id': 'SUBSCRIPTION-21092019-001',
+        }
+
+        body = {
+            "plan_id": plan_id,
+            "start_time": "2025-10-20T12:00:00Z",
+            "application_context": {
+                "user_action": "SUBSCRIBE_NOW",
+                "return_url": "https://localhost:5173/success",
+                "cancel_url": "https://localhost:5173/cancel"
+            }
+        }
+
+        response = requests.post(url, headers=headers, json=body)
+
+        print("PAYPAL RESPONSE:",response.json())
+
+        if response.status_code != 201:
+            return jsonify({"error": "Failed to create subscription"}), 500
+
+        return jsonify({
+            "success": True,
+            "subscription": response.json()
+        })
+
+    except Exception as e:
+        print(f"Error creating subscription: {str(e)}")
+        return jsonify({"error": "Failed to create subscription"}), 500
 
 def main():
     """Main function to run the application"""
