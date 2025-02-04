@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut, Coins, CreditCard, Home } from 'lucide-react';
 import { getUserCredits } from '../services/api';
 import logo from '../assets/logo.png';
+import axios from 'axios';
 
 const navigation = [
   {
@@ -37,6 +38,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
+  const [subscription, setSubscription] = useState<{plan_type: string} | null>(null);
 
   useEffect(() => {
     const loadCredits = async () => {
@@ -44,6 +46,12 @@ export default function Layout({ children }: LayoutProps) {
         try {
           const userCredits = await getUserCredits();
           setCredits(userCredits);
+
+          // Fetch subscription type
+          const response = await axios.get('/api/subscriptions', {
+            headers: { 'X-User-Id': user?.id }
+          });
+          setSubscription(response.data);
         } catch (error) {
           console.error('Error loading credits:', error);
         }
@@ -105,12 +113,14 @@ export default function Layout({ children }: LayoutProps) {
               <span>
                 {credits === null ? (
                   "Loading credits..."
+                ) : subscription?.plan_type === 'yearly' ? (
+                  "Unlimited Credits"
                 ) : (
                   <>{credits} Credits</>
                 )}
               </span>
             </div>
-            {credits !== null && credits <= 2 && (
+            {credits !== null && credits <= 2 && subscription?.plan_type !== 'yearly' && (
               <Link
                 to="/billing"
                 className="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

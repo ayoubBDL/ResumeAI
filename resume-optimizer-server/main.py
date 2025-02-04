@@ -1041,9 +1041,9 @@ def purchase_credits():
                 return jsonify({"error": f"Minimum credit purchase is {min_credits}"}), 400
             credits = requested_credits
         elif plan == 'pro':
-            credits = 50  # $29 for 50 credits
-        elif plan == 'annual':
-            credits = 999999  # Using a large number instead of infinity
+            credits = 50 
+        elif plan == 'yearly':
+            credits = 9999
         else:
             return jsonify({"error": "Invalid plan type"}), 400
 
@@ -1076,6 +1076,28 @@ def purchase_credits():
         print(f"Error purchasing credits: {str(e)}")
         return jsonify({"error": "Failed to purchase credits"}), 500
 
+def generate_paypal_token() -> str:
+    client_id = os.getenv("PAYPAL_CLIENT_ID")
+    client_secret = os.getenv("PAYPAL_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        raise Exception("Missing PayPal client ID or secret in environment variables.")
+    
+    url = "https://api-m.sandbox.paypal.com/v1/oauth2/token"
+    auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": f"Basic {auth_header}",
+    }
+    
+    response = requests.post(url, headers=headers, data="grant_type=client_credentials")
+    
+    if response.status_code == 200:
+        return response.json().get("access_token", "")
+    else:
+        raise Exception(f"Failed to generate token: {response.status_code}, {response.text}")
+
 @app.route('/api/subscriptions', methods=['GET'])
 def get_subscription():
     """Get user's current subscription status"""
@@ -1084,7 +1106,13 @@ def get_subscription():
         if not user_id:
             return jsonify({"error": "User ID is required"}), 401
 
+        data = request.get_json()
+        
+        access_token = generate_paypal_token()
         # Get user's current subscription
+        if not access_token:
+            return jsonify({"error": "Failed to generate Paypal access token"}), 500
+        
         subscription_response = supabase.table('subscriptions')\
             .select('*')\
             .eq('user_id', user_id)\
@@ -1092,6 +1120,29 @@ def get_subscription():
             .order('created_at', desc=True)\
             .limit(1)\
             .execute()
+
+        print("SUBSCRIPTION RESPONSE:",subscription_response)
+
+        url = f'https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_response.data[0].get("paypal_subscription_id")}'
+        print("PAYPAL ACCESS TOKEN GENERATED:",access_token)
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}',
+        }
+        response = requests.get(url, headers=headers)
+
+        print("PAYPAL RESPONSE:",response.json())
+
+        if response.json().get("name") == "INVALID_REQUEST":
+            return jsonify({
+                "has_subscription": False,
+                "subscription": None,
+                "paypal_subscription": None
+            })
+
+        if response.status_code != 200:
+            return jsonify({"error": "Failed to get subscription status"}), 500
 
         if not subscription_response.data:
             return jsonify({
@@ -1101,7 +1152,8 @@ def get_subscription():
 
         return jsonify({
             "has_subscription": True,
-            "subscription": subscription_response.data[0]
+            "subscription": subscription_response.data[0],
+            "paypal_subscription": response.json()
         })
 
     except Exception as e:
@@ -1120,13 +1172,11 @@ def create_subscription():
         if not data or 'plan_type' not in data:
             return jsonify({"error": "Plan type is required"}), 400
 
+        if not data or 'subscriptionId' not in data:
+            return jsonify({"error": "subscriptionId is required"}), 400
+
         plan_type = data['plan_type']
         
-        # Validate plan type
-        # valid_plans = ['free', 'pro', 'enterprise']
-        # if plan_type not in valid_plans:
-        #     return jsonify({"error": f"Invalid plan type. Must be one of: {', '.join(valid_plans)}"}), 400
-
         # Cancel any existing active subscriptions
         supabase.table('subscriptions')\
             .update({'status': 'cancelled'})\
@@ -1139,6 +1189,7 @@ def create_subscription():
         subscription_data = {
             'user_id': user_id,
             'plan_type': plan_type,
+            'paypal_subscription_id': data['subscriptionId'],
             'status': 'active',
             'current_period_start': now.isoformat(),
             'current_period_end': (now + datetime.timedelta(days=30)).isoformat(),
@@ -1156,6 +1207,8 @@ def create_subscription():
             credits = 2
         elif plan_type == 'pro':
             credits = 50
+        elif plan_type == 'yearly':
+            credits = 9999
         elif plan_type == 'enterprise':
             credits = 999999
 
@@ -1283,7 +1336,7 @@ def create_paypal_subscription():
         plan_id = data['plan_id']
         access_token = data['access_token']
         
-        url = 'https://api-m.sandbox.paypal.com/v1/billing/subscriptions'
+        url = f'https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_id}'
 
         if not access_token:
             return jsonify({"error": "Failed to generate Paypal access token"}), 500

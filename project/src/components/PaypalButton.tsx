@@ -29,7 +29,7 @@ export default function PaypalButton({
         console.log("Subscription Actions ", actions);
         if(data.subscriptionID){
             onApprove(data, actions);
-            return actions.redirect();
+            return actions.subscription.activate();
         }
     }
 

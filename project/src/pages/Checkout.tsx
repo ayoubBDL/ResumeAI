@@ -85,7 +85,8 @@ export default function Checkout() {
         await axios.post('/api/subscriptions', 
           { 
             plan_type: plan.type,
-            orderId: data.orderID
+            orderId: data.orderID,
+            subscriptionId: data.subscriptionID
           },
           { headers: { 'X-User-Id': user?.id } }
         );
@@ -108,8 +109,6 @@ export default function Checkout() {
   if (!plan) {
     return <div>Loading plan details...</div>;
   }
-
-  console.log("plan", plan);
 
   return (
     <div className="container mx-auto px-4 py-8">
