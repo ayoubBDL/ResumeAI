@@ -256,7 +256,7 @@ export default function Billing() {
                 </p>
                 {subscription && (
                   <p className="text-sm text-gray-500">
-                    Renews on {new Date(subscription.current_period_end).toLocaleDateString()}
+                    Renews on {new Date(subscription.paypalSubscription?.nextBillingTime || subscription.current_period_end).toLocaleDateString()}
                   </p>
                 )}
               </div>

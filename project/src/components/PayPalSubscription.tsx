@@ -7,10 +7,10 @@ import { useNavigate } from 'react-router-dom';
 
 interface SubscriptionProps {
   plan: {
-    type: string;
     name: string;
     price: string;
     planId?: string;
+    plan_type: string;
   };
   onSuccess?: (details: any) => void;
   onError?: (error: any) => void;
@@ -40,16 +40,16 @@ const PayPalSubscription: React.FC<SubscriptionProps> = ({
       }
     });
   };
-
   const onApprove = async (data: any, actions: any) => {
     try {
       // Capture subscription details
+      console.log("plan", plan);
       const subscriptionDetails = await actions.subscription.get();
       
       // Send subscription details to backend
       await axios.post('/api/subscriptions', 
         { 
-          plan_type: plan.type,
+          plan_type: plan.plan_type,
           subscriptionId: data.subscriptionID,
           paypalDetails: subscriptionDetails
         },

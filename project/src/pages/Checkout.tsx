@@ -82,9 +82,10 @@ export default function Checkout() {
         showToast(`Successfully purchased ${credits} credits!`, 'success');
       } else {
         // Subscription purchase
+        console.log("plan", plan);
         await axios.post('/api/subscriptions', 
           { 
-            plan_type: plan.type,
+            plan_type: plan.plan_type,
             orderId: data.orderID,
             subscriptionId: data.subscriptionID
           },

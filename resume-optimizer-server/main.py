@@ -1106,8 +1106,6 @@ def get_subscription():
         if not user_id:
             return jsonify({"error": "User ID is required"}), 401
 
-        data = request.get_json()
-        
         access_token = generate_paypal_token()
         # Get user's current subscription
         if not access_token:
@@ -1121,18 +1119,13 @@ def get_subscription():
             .limit(1)\
             .execute()
 
-        print("SUBSCRIPTION RESPONSE:",subscription_response)
-
         url = f'https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_response.data[0].get("paypal_subscription_id")}'
-        print("PAYPAL ACCESS TOKEN GENERATED:",access_token)
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': f'Bearer {access_token}',
         }
         response = requests.get(url, headers=headers)
-
-        print("PAYPAL RESPONSE:",response.json())
 
         if response.json().get("name") == "INVALID_REQUEST":
             return jsonify({
@@ -1328,7 +1321,6 @@ def create_paypal_subscription():
             return jsonify({"error": "User ID is required"}), 401
 
         data = request.get_json()
-        print("data:", request)
         if not data or 'plan_id' not in data:
             return jsonify({"error": "Plan ID is required"}), 400
         if not data or 'access_token' not in data:
@@ -1341,7 +1333,6 @@ def create_paypal_subscription():
         if not access_token:
             return jsonify({"error": "Failed to generate Paypal access token"}), 500
         
-        print("PAYPAL ACCESS TOKEN GENERATED:",access_token)
         headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -1361,8 +1352,6 @@ def create_paypal_subscription():
         }
 
         response = requests.post(url, headers=headers, json=body)
-
-        print("PAYPAL RESPONSE:",response.json())
 
         if response.status_code != 201:
             return jsonify({"error": "Failed to create subscription"}), 500

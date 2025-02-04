@@ -44,16 +44,63 @@ export default function Layout({ children }: LayoutProps) {
     const loadCredits = async () => {
       if (user?.id) {
         try {
-          const userCredits = await getUserCredits();
-          setCredits(userCredits);
-
-          // Fetch subscription type
-          const response = await axios.get('/api/subscriptions', {
+          // Check localStorage first
+          const storedSubscription = localStorage.getItem('user_subscription');
+          
+          if (storedSubscription) {
+            const parsedSubscription = JSON.parse(storedSubscription);
+            
+            // Check if subscription is still valid
+            // Check if subscription is still valid
+            const currentTime = new Date();
+            const periodEnd = new Date(parsedSubscription.current_period_end);
+            
+            if (currentTime < periodEnd) {
+              setSubscription(parsedSubscription);
+              
+              // Use credits from localStorage if available
+              if (parsedSubscription.credits !== undefined) {
+                setCredits(parsedSubscription.credits);
+                return;
+              }
+            }
+          }
+          
+          // If no valid localStorage subscription, fetch from API
+          const subResponse = await axios.get('/api/subscriptions', {
             headers: { 'X-User-Id': user?.id }
           });
-          setSubscription(response.data);
+          
+          const { subscription, has_subscription } = subResponse.data;
+          
+          // If no subscription, set to null
+          if (!has_subscription) {
+            setSubscription(null);
+            setCredits(0);
+            return;
+          }
+          
+          // Set subscription
+          setSubscription(subscription);
+          
+          // Fetch credits
+          const creditsResponse = await axios.get('/api/credits', {
+            headers: { 'X-User-Id': user?.id }
+          });
+          
+          const userCredits = creditsResponse.data.credits;
+          setCredits(userCredits);
+          
+          // Update localStorage
+          localStorage.setItem('user_subscription', JSON.stringify({
+            ...subscription,
+            credits: subscription.plan_type === 'yearly' ? 9999 : userCredits
+          }));
+          
         } catch (error) {
           console.error('Error loading credits:', error);
+          setCredits(0);
+          setSubscription(null);
         }
       }
     };
@@ -111,13 +158,11 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center mb-4 px-2 py-2 text-sm text-gray-600">
               <Coins className="h-5 w-5 mr-3 text-yellow-500" />
               <span>
-                {credits === null ? (
-                  "Loading credits..."
-                ) : subscription?.plan_type === 'yearly' ? (
-                  "Unlimited Credits"
-                ) : (
-                  <>{credits} Credits</>
-                )}
+                {subscription?.plan_type === 'yearly' 
+                  ? "Unlimited Credits"
+                  : (credits !== null && credits > 0
+                    ? `${credits} Credits`
+                    : "No credits available")}
               </span>
             </div>
             {credits !== null && credits <= 2 && subscription?.plan_type !== 'yearly' && (
