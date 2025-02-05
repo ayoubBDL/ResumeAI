@@ -39,7 +39,7 @@ export interface OptimizedResume {
 }
 
 // Resume optimization service
-export const optimizeResume = async (formData: FormData): Promise<any> => {
+export const optimizeResume = async (formData: FormData, onCreditsUpdate?: () => Promise<void>): Promise<any> => {
   try {
     // Get the current user and session
     const { data: { session } } = await supabase.auth.getSession();
@@ -70,6 +70,11 @@ export const optimizeResume = async (formData: FormData): Promise<any> => {
       throw new Error(responseData.error || 'Failed to optimize resume');
     }
 
+    // Force update credits after successful optimization
+    if (onCreditsUpdate) {
+      await onCreditsUpdate();
+    }
+
     // Create a blob from the base64 PDF data
     const pdfBlob = base64ToBlob(responseData.pdf_data, 'application/pdf');
     const blobUrl = URL.createObjectURL(pdfBlob);
@@ -79,15 +84,13 @@ export const optimizeResume = async (formData: FormData): Promise<any> => {
       id: responseData.resume_id,
       user_id: session.user.id,
       title: responseData.title || 'Optimized Resume',
-      created_at: responseData.created_at || new Date().toISOString(),
-      optimized_pdf_url: blobUrl,
+      created_at: responseData.created_at,
+      pdf_url: blobUrl,
       analysis: responseData.analysis,
-      job_url: responseData.job_url,
-      status: responseData.status || 'completed'
+      job_url: responseData.job_url
     };
-
   } catch (error) {
-    console.error('Error in optimizeResume:', error);
+    console.error('Error optimizing resume:', error);
     throw error;
   }
 };

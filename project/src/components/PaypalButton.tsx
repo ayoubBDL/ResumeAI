@@ -5,46 +5,102 @@ const API_URL = import.meta.env.VITE_RESUME_API_URL || 'http://localhost:5050';
 export default function PaypalButton({ 
     onApprove, 
     onCancel,
-    plan_id
+    plan_id,
+    isSubscription = true,
+    amount,
+    description,
+    onCreditsUpdate
   }: { 
     onApprove: (data: any, actions: any) => Promise<void>, 
     onCancel: (data: any) => void,
-    plan_id: string
+    plan_id?: string,
+    isSubscription?: boolean,
+    amount?: string,
+    description?: string,
+    onCreditsUpdate?: () => Promise<void>
   })  {
 
-    const handleSubscription = async (data: any, actions: any) => {
-        console.log("Create subscription data", plan_id);
+    const createSubscription = async (data: any, actions: any) => {
+        if (!plan_id) {
+            console.error("No plan_id provided for subscription");
+            return;
+        }
+        console.log("Creating subscription with plan_id:", plan_id);
         return actions.subscription.create({
             plan_id: plan_id,
             application_context: {
-                shipping_preference: "NO_SHIPPING",
-                return_url: `${import.meta.env.VITE_PAYPAL_RETURN_URL}`,
-                cancel_url: `${import.meta.env.VITE_PAYPAL_CANCEL_URL}`
+                shipping_preference: "NO_SHIPPING"
             }
         });
     }
 
-    const handleApprove = (data: any, actions: any) => {
-        console.log("Subscription approved", data);
-        console.log("Subscription Actions ", actions);
-        if(data.subscriptionID){
-            onApprove(data, actions);
-            return actions.subscription.activate();
+    const createOrder = async (data: any, actions: any) => {
+        if (!amount) {
+          throw new Error('Amount is required for one-time payment');
         }
-    }
+
+        return await actions.order.create({
+          purchase_units: [{
+            amount: {
+              value: amount,
+              currency_code: "USD"
+            },
+            description: description || 'One-time payment'
+          }]
+        });
+    };
+
+    const onApproveHandler = async (data: any, actions: any) => {
+        try {
+          if (isSubscription) {
+            // For subscriptions, just pass the data to parent
+            await onApprove(data, actions);
+          } else {
+            // For one-time payments, capture the order first
+            const orderData = await actions.order.capture();
+            await onApprove({
+              orderID: data.orderID,
+              ...orderData
+            }, actions);
+          }
+          
+          // Update credits after successful payment
+          if (onCreditsUpdate) {
+            await onCreditsUpdate();
+          }
+        } catch (error) {
+          console.error('PayPal approval error:', error);
+          throw error;
+        }
+    };
 
     const handleCancel = (data: any) => {
-        console.log("Subscription cancelled", data);
+        console.log("Payment cancelled", data);
         onCancel(data);
     }
+
+    const style = {
+        shape: "rect",
+        label: isSubscription ? "subscribe" : "pay"
+    } as any;
+
     return (
         <div>
-            <PayPalButtons
-                createSubscription={handleSubscription}
-                style={{shape: "rect", label: "subscribe"}}
-                onApprove={handleApprove}
-                onCancel={handleCancel}
-            />
+            {isSubscription ? (
+                <PayPalButtons
+                  createSubscription={createSubscription}
+                  onApprove={onApproveHandler}
+                  onCancel={handleCancel}
+                  style={style}
+                />
+              ) : (
+                <PayPalButtons
+                  createOrder={createOrder}
+                  onApprove={onApproveHandler}
+                  onCancel={handleCancel}
+                  style={style}
+                />
+              )}
         </div>
     );
 }

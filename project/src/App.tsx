@@ -16,6 +16,7 @@ import CancelPage from './pages/CancelPage';
 import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { CreditsProvider } from './context/CreditsContext';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -50,45 +51,47 @@ function App() {
       }}
     >
       <AuthProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/success" element={<SuccessPage />} />
-              <Route path="/cancel" element={<CancelPage />} />
-              
-              {/* Protected Routes */}
-              <Route path="/dashboard" element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              } />
-              <Route path="/my-resumes" element={
-                <PrivateRoute>
-                  <MyResumes />
-                </PrivateRoute>
-              } />
-              <Route path="/saved-jobs" element={
-                <PrivateRoute>
-                  <SavedJobs />
-                </PrivateRoute>
-              } />
-              <Route path="/billing" element={
-                <PrivateRoute>
-                  <Billing />
-                </PrivateRoute>
-              } />
-              <Route path="/checkout" element={
-                <PrivateRoute>
-                  <Checkout />
-                </PrivateRoute>
-              } />
-            </Routes>
-          </BrowserRouter>
-        </ToastProvider>
+        <CreditsProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/success" element={<SuccessPage />} />
+                <Route path="/cancel" element={<CancelPage />} />
+                
+                {/* Protected Routes */}
+                <Route path="/dashboard" element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                } />
+                <Route path="/my-resumes" element={
+                  <PrivateRoute>
+                    <MyResumes />
+                  </PrivateRoute>
+                } />
+                <Route path="/saved-jobs" element={
+                  <PrivateRoute>
+                    <SavedJobs />
+                  </PrivateRoute>
+                } />
+                <Route path="/billing" element={
+                  <PrivateRoute>
+                    <Billing />
+                  </PrivateRoute>
+                } />
+                <Route path="/checkout" element={
+                  <PrivateRoute>
+                    <Checkout />
+                  </PrivateRoute>
+                } />
+              </Routes>
+            </BrowserRouter>
+          </ToastProvider>
+        </CreditsProvider>
       </AuthProvider>
     </PayPalScriptProvider>
   );

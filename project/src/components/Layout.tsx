@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCredits } from '../context/CreditsContext';
 import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut, Coins, CreditCard, Home } from 'lucide-react';
 import { getUserCredits } from '../services/api';
 import logo from '../assets/logo.png';
@@ -37,75 +38,65 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
-  const [credits, setCredits] = useState<number | null>(null);
+  const { credits, updateCredits } = useCredits();
   const [subscription, setSubscription] = useState<{plan_type: string} | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadCredits = async () => {
-      if (user?.id) {
-        try {
-          // Check localStorage first
-          const storedSubscription = localStorage.getItem('user_subscription');
-          
-          if (storedSubscription) {
-            const parsedSubscription = JSON.parse(storedSubscription);
-            
-            // Check if subscription is still valid
-            // Check if subscription is still valid
-            const currentTime = new Date();
-            const periodEnd = new Date(parsedSubscription.current_period_end);
-            
-            if (currentTime < periodEnd) {
-              setSubscription(parsedSubscription);
-              
-              // Use credits from localStorage if available
-              if (parsedSubscription.credits !== undefined) {
-                setCredits(parsedSubscription.credits);
-                return;
-              }
-            }
-          }
-          
-          // If no valid localStorage subscription, fetch from API
-          const subResponse = await axios.get('/api/subscriptions', {
-            headers: { 'X-User-Id': user?.id }
-          });
-          
-          const { subscription, has_subscription } = subResponse.data;
-          
-          // If no subscription, set to null
-          if (!has_subscription) {
-            setSubscription(null);
-            setCredits(0);
+    const fetchData = async () => {
+      try {
+        if (!user) {
+          navigate('/login');
+          return;
+        }
+
+        // Check if we have cached subscription data
+        const cachedSubscription = localStorage.getItem('user_subscription');
+        if (cachedSubscription) {
+          const parsed = JSON.parse(cachedSubscription);
+          const lastChecked = new Date(parsed.lastChecked);
+          const now = new Date();
+          // Only use cache if it's less than 5 minutes old
+          if (now.getTime() - lastChecked.getTime() < 5 * 60 * 1000) {
+            setSubscription(parsed);
+            setLoading(false);
             return;
           }
-          
-          // Set subscription
-          setSubscription(subscription);
-          
-          // Fetch credits
-          const creditsResponse = await axios.get('/api/credits', {
-            headers: { 'X-User-Id': user?.id }
-          });
-          
-          const userCredits = creditsResponse.data.credits;
-          setCredits(userCredits);
-          
-          // Update localStorage
-          localStorage.setItem('user_subscription', JSON.stringify({
-            ...subscription,
-            credits: subscription.plan_type === 'yearly' ? 9999 : userCredits
-          }));
-          
-        } catch (error) {
-          console.error('Error loading credits:', error);
-          setCredits(0);
-          setSubscription(null);
         }
+
+        // Fetch subscription data if no cache or cache expired
+        const response = await axios.get('/api/subscriptions', {
+          headers: { 'X-User-Id': user.id }
+        });
+
+        const subscription = response.data;
+        
+        if (!subscription) {
+          navigate('/billing');
+          return;
+        }
+        
+        // Set subscription
+        setSubscription(subscription);
+        
+        // Update localStorage with timestamp
+        localStorage.setItem('user_subscription', JSON.stringify({
+          ...subscription,
+          lastChecked: new Date().toISOString()
+        }));
+
+      } catch (error) {
+        console.error('Error:', error);
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          navigate('/billing');
+        }
+      } finally {
+        setLoading(false);
       }
     };
-    loadCredits();
-  }, [user?.id]);
+
+    fetchData();
+  }, [user, navigate]);
 
   const handleSignOut = async () => {
     try {

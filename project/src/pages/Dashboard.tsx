@@ -3,7 +3,8 @@ import Layout from '../components/Layout';
 import { optimizeResume, getRecentResumes, getUserCredits, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 import { useToast } from '../context/ToastContext';
-import {CreditAlert} from '../components/CreditAlert';
+import { useCredits } from '../context/CreditsContext';
+import { CreditAlert } from '@/components/CreditAlert';
 
 function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
@@ -17,6 +18,7 @@ function Dashboard() {
   const [creditError, setCreditError] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+  const { forceUpdate } = useCredits();
 
   useEffect(() => {
     loadRecentResumes();
@@ -109,6 +111,9 @@ function Dashboard() {
 
       const resume = await optimizeResume(formData);
       resetForm();
+      
+      // Update credits immediately after optimization
+      await forceUpdate();
       
       // Show success toast
       showToast('Resume optimized successfully!', 'success');
