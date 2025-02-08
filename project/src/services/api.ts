@@ -1,7 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const API_URL = import.meta.env.VITE_RESUME_API_URL || 'http://localhost:5000';
-const JOB_API_URL = import.meta.env.VITE_JOB_API_URL;
+const API_URL = import.meta.env.VITE_RESUME_API_URL;
 
 export interface JobApplication {
   id: string;

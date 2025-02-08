@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import Dashboard from './pages/Dashboard';
 import SavedJobs from './pages/SavedJobs';
@@ -25,7 +24,7 @@ interface PrivateRouteProps {
 }
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
-  const { user, session, loading } = useAuth();
+  const { user, loading } = useAuth();
   
   if (loading) {
     return <div>Loading...</div>; // Or a loading spinner

@@ -169,6 +169,7 @@ export default function Settings() {
       });
     } finally {
       setIsCancelling(false);
+      setShowConfirmation(false);
     }
   };
 

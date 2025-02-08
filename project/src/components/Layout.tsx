@@ -73,31 +73,6 @@ export default function Layout({ children }: LayoutProps) {
             return;
           }
         }
-
-        // Fetch subscription data if no cache or cache expired
-        const response = await axios.get('/api/subscriptions', {
-          headers: { 'X-User-Id': user.id }
-        });
-
-        const subscriptionData = response.data;
-        
-        if (!subscriptionData) {
-          if (isMounted) {
-            navigate('/billing');
-          }
-          return;
-        }
-        
-        // Set subscription only if component is still mounted
-        if (isMounted) {
-          setSubscription(subscriptionData);
-          
-          // Update localStorage with timestamp
-          localStorage.setItem('user_subscription', JSON.stringify({
-            ...subscriptionData,
-            lastChecked: new Date().toISOString()
-          }));
-        }
       } catch (error) {
         console.error('Error:', error);
         if (isMounted && axios.isAxiosError(error) && error.response?.status === 404) {
