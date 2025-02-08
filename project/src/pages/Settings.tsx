@@ -227,194 +227,200 @@ export default function Settings() {
     return providers;
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <RefreshCcw className="animate-spin text-blue-500" size={48} />
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
-      
-      <div className="bg-white shadow rounded-lg divide-y divide-gray-200">
-        {/* Profile Section */}
-        <div className="p-6">
-          <div className="flex items-center mb-4">
-            <User className="h-5 w-5 text-gray-500 mr-2" />
-            <h2 className="text-lg font-medium text-gray-900">Profile Settings</h2>
+    <div className="container mx-auto px-4 py-8">
+      {isLoading ? (
+        <div className="text-center py-12 bg-white shadow overflow-hidden sm:rounded-md">
+          <div className="mx-auto h-12 w-12 text-gray-400">
+            <svg className="animate-spin h-12 w-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
           </div>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Loading settings...</h3>
+        </div>
+      ) : (
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
           
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full Name
-              </label>
-              <div className="mt-1">
-                <input
-                  type="text"
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                />
+          <div className="bg-white shadow rounded-lg divide-y divide-gray-200">
+            {/* Profile Section */}
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <User className="h-5 w-5 text-gray-500 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">Profile Settings</h2>
               </div>
+              
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Full Name
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email Address
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      disabled
+                      className="shadow-sm block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Connected With
+                  </label>
+                  <div className="mt-1 space-y-2">
+                    {getProviders().map((providerType) => (
+                      <div key={providerType} className="flex items-center space-x-2">
+                        {providerType === 'google' && (
+                          <>
+                            <GoogleIcon />
+                            <span className="text-sm text-gray-600">Google Account</span>
+                          </>
+                        )}
+                        {providerType === 'email' && (
+                          <>
+                            <Mail className="h-5 w-5 text-gray-500" />
+                            <span className="text-sm text-gray-600">Email & Password</span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="inline-flex justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Update Profile
+                </button>
+              </form>
             </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address
-              </label>
-              <div className="mt-1">
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  disabled
-                  className="shadow-sm block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
-                />
+            {/* Notifications Section */}
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <Bell className="h-5 w-5 text-gray-500 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">Notification Preferences</h2>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Connected With
-              </label>
-              <div className="mt-1 space-y-2">
-                {getProviders().map((providerType) => (
-                  <div key={providerType} className="flex items-center space-x-2">
-                    {providerType === 'google' && (
-                      <>
-                        <GoogleIcon />
-                        <span className="text-sm text-gray-600">Google Account</span>
-                      </>
-                    )}
-                    {providerType === 'email' && (
-                      <>
-                        <Mail className="h-5 w-5 text-gray-500" />
-                        <span className="text-sm text-gray-600">Email & Password</span>
-                      </>
-                    )}
+              
+              <div className="space-y-4">
+                {Object.entries(notifications).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-sm text-gray-700">
+                      {key === 'emailUpdates' && 'Email Updates'}
+                      {key === 'securityAlerts' && 'Security Alerts'}
+                      {key === 'marketingEmails' && 'Marketing Emails'}
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={value}
+                        onChange={() => toggleNotification(key as keyof NotificationSettings)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
                   </div>
                 ))}
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="inline-flex justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Update Profile
-            </button>
-          </form>
-        </div>
-
-        {/* Notifications Section */}
-        <div className="p-6">
-          <div className="flex items-center mb-4">
-            <Bell className="h-5 w-5 text-gray-500 mr-2" />
-            <h2 className="text-lg font-medium text-gray-900">Notification Preferences</h2>
-          </div>
-          
-          <div className="space-y-4">
-            {Object.entries(notifications).map(([key, value]) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">
-                  {key === 'emailUpdates' && 'Email Updates'}
-                  {key === 'securityAlerts' && 'Security Alerts'}
-                  {key === 'marketingEmails' && 'Marketing Emails'}
-                </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={() => toggleNotification(key as keyof NotificationSettings)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                </label>
+            {/* Security Section */}
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <Shield className="h-5 w-5 text-gray-500 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">Security</h2>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Security Section */}
-        <div className="p-6">
-          <div className="flex items-center mb-4">
-            <Shield className="h-5 w-5 text-gray-500 mr-2" />
-            <h2 className="text-lg font-medium text-gray-900">Security</h2>
-          </div>
-          
-          <button
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <Lock className="h-4 w-4 mr-2" />
-            Change Password
-          </button>
-        </div>
-
-        {/* Subscription Section - Now at the bottom */}
-        <div className="p-6">
-          <div className="flex items-center mb-4">
-            <CreditCard className="h-5 w-5 text-gray-500 mr-2" />
-            <h2 className="text-lg font-medium text-gray-900">Subscription</h2>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">Current Plan</p>
-                <p className="text-sm text-gray-500">{currentPlan}</p>
-              </div>
-              <div className="flex items-center">
-                {hasActiveSubscription ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-500 mr-2" />
-                )}
-                <span className="text-sm text-gray-700">
-                  {hasActiveSubscription ? 'Active' : 'No active subscription'}
-                </span>
-              </div>
+              
+              <button
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                Change Password
+              </button>
             </div>
 
-            {/* Only show cancel button if there's an active subscription */}
-            {hasActiveSubscription && (
-              <>
-                <Button 
-                  variant="destructive"
-                  onClick={() => setShowConfirmation(true)}
-                >
-                  Cancel Subscription
-                </Button>
-              </>
-            )}
+            {/* Subscription Section - Now at the bottom */}
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <CreditCard className="h-5 w-5 text-gray-500 mr-2" />
+                <h2 className="text-lg font-medium text-gray-900">Subscription</h2>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Current Plan</p>
+                    <p className="text-sm text-gray-500">{currentPlan}</p>
+                  </div>
+                  <div className="flex items-center">
+                    {hasActiveSubscription ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-500 mr-2" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500 mr-2" />
+                    )}
+                    <span className="text-sm text-gray-700">
+                      {hasActiveSubscription ? 'Active' : 'No active subscription'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Only show cancel button if there's an active subscription */}
+                {hasActiveSubscription && (
+                  <>
+                    <Button 
+                      variant="destructive"
+                      onClick={() => setShowConfirmation(true)}
+                    >
+                      Cancel Subscription
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* Put AlertDialog at the bottom of the page component, before the final closing div */}
+          {showConfirmation && (
+            <AlertDialog
+              error="Cancel Subscription"
+              message="Are you sure you want to cancel your subscription? Your access will continue until the end of your current billing period."
+              action="confirm"
+              onAction={handleCancelSubscription}
+              onClose={() => setShowConfirmation(false)}
+              disabled={isCancelling}
+              actionLabel={isCancelling ? 'Cancelling...' : 'Yes, Cancel'}
+            />
+          )}
+
+          {cancelError && (
+            <AlertDialog
+              error={cancelError.error}
+              message={cancelError.message}
+              action="retry"
+              onClose={() => setCancelError(null)}
+            />
+          )}
         </div>
-      </div>
-
-      {/* Put AlertDialog at the bottom of the page component, before the final closing div */}
-      {showConfirmation && (
-        <AlertDialog
-          error="Cancel Subscription"
-          message="Are you sure you want to cancel your subscription? Your access will continue until the end of your current billing period."
-          action="confirm"
-          onAction={handleCancelSubscription}
-          onClose={() => setShowConfirmation(false)}
-          disabled={isCancelling}
-          actionLabel={isCancelling ? 'Cancelling...' : 'Yes, Cancel'}
-        />
-      )}
-
-      {cancelError && (
-        <AlertDialog
-          error={cancelError.error}
-          message={cancelError.message}
-          action="retry"
-          onClose={() => setCancelError(null)}
-        />
       )}
     </div>
   );

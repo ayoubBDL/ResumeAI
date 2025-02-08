@@ -2,8 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Zap, DollarSign, Upload, Linkedin, Clock, Target, CheckCircle, ArrowRight, Menu } from 'lucide-react';
 import logo from '../assets/logo.png';
+import { useAuth } from '@/context/AuthContext';
 
 function LandingPage() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Header */}
@@ -23,8 +26,23 @@ function LandingPage() {
               <a href="#pricing" className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Pricing</a>
             </div>
             <div className="flex items-center space-x-4">
-              <Link to="/login" className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Sign in</Link>
-              <Link to="/signup" className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-indigo-700">Get Started</Link>
+              {user ? (
+                <Link 
+                  to="/dashboard" 
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-indigo-700"
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link to="/login" className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">
+                    Sign in
+                  </Link>
+                  <Link to="/signup" className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-indigo-700">
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
             <button className="sm:hidden">
               <Menu className="w-6 h-6" />
