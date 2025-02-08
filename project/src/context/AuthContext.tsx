@@ -10,6 +10,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   user: User | null;
+  setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,6 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          name: email.split('@')[0], // Set initial name from email
+        }
+      }
     });
     return response;
   };
@@ -127,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signInWithGoogle,
     signOut,
+    setUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

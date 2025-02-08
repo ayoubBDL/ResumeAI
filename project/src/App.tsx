@@ -17,6 +17,7 @@ import Layout from './components/Layout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { CreditsProvider } from './context/CreditsContext';
+import Settings from './pages/Settings';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -86,6 +87,11 @@ function App() {
                 <Route path="/checkout" element={
                   <PrivateRoute>
                     <Checkout />
+                  </PrivateRoute>
+                } />
+                <Route path="/settings" element={
+                  <PrivateRoute>
+                    <Settings />
                   </PrivateRoute>
                 } />
               </Routes>

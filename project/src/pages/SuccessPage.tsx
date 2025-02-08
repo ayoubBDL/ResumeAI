@@ -39,7 +39,11 @@ const SuccessPage: React.FC = () => {
     };
 
     if (user) {
-      verifySubscription();
+      if(location.state && location.state.subscriptionId){
+        verifySubscription();
+      }else{
+        setIsProcessing(false);
+      }
     }
   }, [user, location.state, navigate, showToast]);
 
@@ -48,7 +52,7 @@ const SuccessPage: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-xl">Processing your subscription...</p>
+          <p className="text-xl">Processing your {location.state.subscriptionId? "subscription" : "purchase"}...</p>
         </div>
       </div>
     );
@@ -58,9 +62,9 @@ const SuccessPage: React.FC = () => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-md w-full">
         <CheckCircle className="mx-auto h-24 w-24 text-green-500 mb-4" />
-        <h1 className="text-3xl font-bold mb-4">Subscription Successful!</h1>
+        <h1 className="text-3xl font-bold mb-4">{location.state.subscriptionId? "Subscription" : "Purchase"} Successful!</h1>
         <p className="text-gray-600 mb-6">
-          Your subscription has been activated. Thank you for choosing our service.
+          Your {location.state.subscriptionId? "subscription has been activated." : "purchase has been completed."} Thank you for choosing our service.
         </p>
         <div className="flex justify-center space-x-4">
           <button 

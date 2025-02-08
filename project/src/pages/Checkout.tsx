@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "../components/ui/button";
-import { PayPalButtons, PayPalScriptProvider } from '@paypal/react-paypal-js';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { CheckCircle, ArrowLeft } from 'lucide-react';
@@ -54,39 +53,16 @@ export default function Checkout() {
     ? (credits * 1).toFixed(2)  // $1 per credit
     : plan?.price?.replace(/[^0-9.-]+/g,"") || "0";
 
-  const createOrder = (data: any, actions: any) => {
-    const totalAmount = plan?.plan_type === 'payg' 
-      ? (credits * 1).toFixed(2)  // $1 per credit
-      : plan?.price?.replace(/[^0-9.-]+/g,"") || "0";
 
-    return actions.order.create({
-      purchase_units: [{
-        amount: {
-          value: totalAmount,
-          currency_code: "USD"
-        },
-        description: plan?.plan_type === 'payg' 
-          ? `${credits} Credits at $1 each` 
-          : `${plan?.name || 'Plan'} Plan`
-      }]
-    });
-  };
-
-  const onCancel = (data: any) => {
+  const onCancel = () => {
     navigate('/cancel');
   };
-  const onApprove = async (data: any, actions: any) => {
+  const onApprove = async (data: any) => {
     try {
       setIsProcessing(true);
       // Send subscription/credit purchase request to backend
       if (plan.plan_type === 'payg') {
         // Credit purchase
-        const response = await axios.post('/api/credits/purchase', {
-          orderId: data.orderID,
-          credits: credits
-        }, {
-          headers: { 'X-User-Id': user?.id }
-        });
 
         // Update credits in context and localStorage
         await updateCredits();
@@ -94,7 +70,6 @@ export default function Checkout() {
         showToast(`Successfully purchased ${credits} credits!`, 'success');
       } else {
         // Subscription purchase
-        console.log("Subscription data:", data);
         await axios.post('/api/subscriptions', 
           { 
             plan_type: plan.plan_type,

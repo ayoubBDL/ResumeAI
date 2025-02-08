@@ -4,7 +4,8 @@ import { optimizeResume, getRecentResumes, getUserCredits, type Resume } from '.
 import ResumeCard from '../components/ResumeCard';
 import { useToast } from '../context/ToastContext';
 import { useCredits } from '../context/CreditsContext';
-import { CreditAlert } from '@/components/CreditAlert';
+import { AlertDialog } from '@/components/AlertDialog';
+import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
@@ -19,6 +20,7 @@ function Dashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
   const { forceUpdate } = useCredits();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadRecentResumes();
@@ -276,10 +278,11 @@ function Dashboard() {
         {/* Removed credits display */}
 
         {creditError && (
-          <CreditAlert
+          <AlertDialog
             error={creditError.error}
             message={creditError.message}
-            action={creditError.action}
+            action="purchase"
+            onAction={() => navigate('/billing')}
             onClose={() => setCreditError(null)}
           />
         )}

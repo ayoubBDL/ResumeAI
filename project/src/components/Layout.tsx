@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
-import { FileText, BookmarkCheck, Layout as LayoutIcon, LogOut, Coins, CreditCard, Home } from 'lucide-react';
-import { getUserCredits } from '../services/api';
+import { FileText, BookmarkCheck, LogOut, Coins, CreditCard, Home, Settings } from 'lucide-react';
 import logo from '../assets/logo.png';
 import axios from 'axios';
 
@@ -34,15 +33,24 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+interface Subscription {
+  plan_type: string;
+  subscription?: {
+    plan_type: string;
+  };
+}
+
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
   const { credits, updateCredits } = useCredits();
-  const [subscription, setSubscription] = useState<{plan_type: string} | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       try {
         if (!user) {
@@ -58,8 +66,10 @@ export default function Layout({ children }: LayoutProps) {
           const now = new Date();
           // Only use cache if it's less than 5 minutes old
           if (now.getTime() - lastChecked.getTime() < 5 * 60 * 1000) {
-            setSubscription(parsed);
-            setLoading(false);
+            if (isMounted) {
+              setSubscription(parsed);
+              setLoading(false);
+            }
             return;
           }
         }
@@ -69,34 +79,45 @@ export default function Layout({ children }: LayoutProps) {
           headers: { 'X-User-Id': user.id }
         });
 
-        const subscription = response.data;
+        const subscriptionData = response.data;
         
-        if (!subscription) {
-          navigate('/billing');
+        if (!subscriptionData) {
+          if (isMounted) {
+            navigate('/billing');
+          }
           return;
         }
         
-        // Set subscription
-        setSubscription(subscription);
-        
-        // Update localStorage with timestamp
-        localStorage.setItem('user_subscription', JSON.stringify({
-          ...subscription,
-          lastChecked: new Date().toISOString()
-        }));
-
+        // Set subscription only if component is still mounted
+        if (isMounted) {
+          setSubscription(subscriptionData);
+          
+          // Update localStorage with timestamp
+          localStorage.setItem('user_subscription', JSON.stringify({
+            ...subscriptionData,
+            lastChecked: new Date().toISOString()
+          }));
+        }
       } catch (error) {
         console.error('Error:', error);
-        if (axios.isAxiosError(error) && error.response?.status === 404) {
+        if (isMounted && axios.isAxiosError(error) && error.response?.status === 404) {
           navigate('/billing');
         }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
+    // Initial fetch
     fetchData();
-  }, [user, navigate]);
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [user, navigate]); // Only re-run when user or navigate changes
 
   const handleSignOut = async () => {
     try {
@@ -149,14 +170,14 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center mb-4 px-2 py-2 text-sm text-gray-600">
               <Coins className="h-5 w-5 mr-3 text-yellow-500" />
               <span>
-                {subscription?.plan_type === 'yearly' 
+                {subscription?.subscription?.plan_type === 'yearly' || subscription?.plan_type === 'yearly'
                   ? "Unlimited Credits"
                   : (credits !== null && credits > 0
                     ? `${credits} Credits`
                     : "No credits available")}
               </span>
             </div>
-            {credits !== null && credits <= 2 && subscription?.plan_type !== 'yearly' && (
+            {credits !== null && credits <= 2 && subscription?.plan_type !== 'yearly' && subscription?.subscription?.plan_type !== 'yearly' && (
               <Link
                 to="/billing"
                 className="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -164,6 +185,13 @@ export default function Layout({ children }: LayoutProps) {
                 Purchase Credits
               </Link>
             )}
+            <button
+              onClick={() => navigate('/settings')}
+              className="flex items-center w-full px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"
+            >
+              <Settings className="h-5 w-5 mr-3" />
+              Settings
+            </button>
             <button
               onClick={handleSignOut}
               className="flex items-center w-full px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"

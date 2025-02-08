@@ -60,6 +60,10 @@ app.config['DEBUG'] = True
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.jinja_env.auto_reload = True
 
+# At the top with other environment checks
+if not os.getenv('PAYPAL_API_URL'):
+    raise ValueError("PayPal API URL not found in environment variables")
+
 def generate_with_ollama(prompt):
     """Generate optimization suggestions using Ollama"""
     try:
@@ -1095,11 +1099,7 @@ def get_subscription():
         if not user_id:
             return jsonify({"error": "User ID is required"}), 401
 
-        access_token = generate_paypal_token()
-        # Get user's current subscription
-        if not access_token:
-            return jsonify({"error": "Failed to generate Paypal access token"}), 500
-        
+        # Get subscription from Supabase first
         subscription_response = supabase.table('subscriptions')\
             .select('*')\
             .eq('user_id', user_id)\
@@ -1108,33 +1108,62 @@ def get_subscription():
             .limit(1)\
             .execute()
 
-        url = f'https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_response.data[0].get("paypal_subscription_id")}'
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {access_token}',
-        }
-        response = requests.get(url, headers=headers)
-
-        if response.json().get("name") == "INVALID_REQUEST":
-            return jsonify({
-                "has_subscription": False,
-                "subscription": None,
-                "paypal_subscription": None
-            })
-
-        if response.status_code != 200:
-            return jsonify({"error": "Failed to get subscription status"}), 500
-
-        if not subscription_response.data:
+        # If no subscription found, return early
+        if not subscription_response.data or len(subscription_response.data) == 0:
             return jsonify({
                 "has_subscription": False,
                 "subscription": None
             })
 
+        # Get the subscription data
+        subscription = subscription_response.data[0]
+        paypal_subscription_id = subscription.get('paypal_subscription_id')
+
+        # If no PayPal subscription ID, return just the Supabase data
+        if not paypal_subscription_id:
+            return jsonify({
+                "has_subscription": True,
+                "subscription": subscription
+            })
+
+        # Now check PayPal status
+        access_token = generate_paypal_token()
+        if not access_token:
+            return jsonify({"error": "Failed to generate Paypal access token"}), 500
+
+        url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}"
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}'
+        }
+        
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            paypal_status = response.json().get('status', '').lower()
+            
+            # If cancelled in PayPal but active in Supabase, update Supabase
+            if paypal_status in ['cancelled', 'suspended', 'expired']:
+                now = datetime.datetime.utcnow()
+                supabase.table('subscriptions')\
+                    .update({
+                        'status': paypal_status,
+                        'updated_at': now.isoformat(),
+                        'cancelled_at': now.isoformat()
+                    })\
+                    .eq('id', subscription.get('id'))\
+                    .execute()
+
+                return jsonify({
+                    "has_subscription": False,
+                    "subscription": subscription,
+                    "paypal_subscription": response.json()
+                })
+
         return jsonify({
             "has_subscription": True,
-            "subscription": subscription_response.data[0],
+            "subscription": subscription,
             "paypal_subscription": response.json()
         })
 
@@ -1220,22 +1249,121 @@ def create_subscription():
         print(f"Error creating subscription: {str(e)}")
         return jsonify({"error": "Failed to create subscription"}), 500
 
-@app.route('/api/subscriptions/cancel', methods=['POST'])
+@app.route('/api/cancel-subscription', methods=['POST', 'OPTIONS'])
 def cancel_subscription():
     """Cancel user subscription"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            return jsonify({
+                "success": False,
+                "error": "User ID is required"
+            }), 401
 
-        # Cancel active subscription
+        # Get the active subscription for the user
+        subscription_result = supabase.table('subscriptions')\
+            .select('*')\
+            .eq('user_id', user_id)\
+            .eq('status', 'active')\
+            .execute()
+
+        if not subscription_result.data:
+            return jsonify({
+                "success": False,
+                "error": "No active subscription found"
+            }), 404
+
+        subscription = subscription_result.data[0]
+        subscription_id = subscription.get('id')
+        paypal_subscription_id = subscription.get('paypal_subscription_id')
+
+        if not subscription_id:
+            return jsonify({
+                "success": False,
+                "error": "Invalid subscription ID"
+            }), 400
+
+        if not paypal_subscription_id:
+            return jsonify({
+                "success": False,
+                "error": "No PayPal subscription ID found"
+            }), 400
+
+        # Generate PayPal access token
+        try:
+            access_token = generate_paypal_token()
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"Failed to generate PayPal token: {str(e)}"
+            }), 500
+
+        # First check subscription status in PayPal
+        status_url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}"
+        headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}'
+        }
+
+        status_response = requests.get(status_url, headers=headers)
+        print("PayPal Status Response:", status_response.json())
+
+        if status_response.status_code == 200:
+            paypal_status = status_response.json().get('status', '').lower()
+            
+            # If already cancelled in PayPal, just update Supabase
+            if paypal_status in ['cancelled', 'suspended', 'expired']:
+                now = datetime.datetime.utcnow()
+                supabase.table('subscriptions')\
+                    .update({
+                        'status': 'cancelled',
+                        'updated_at': now.isoformat(),
+                        'cancelled_at': now.isoformat()
+                    })\
+                    .eq('id', subscription_id)\
+                    .execute()
+
+                return jsonify({
+                    "success": True,
+                    "message": "Subscription status synchronized with PayPal"
+                })
+
+        # If not cancelled, proceed with cancellation
+        cancel_url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}/cancel"
+        cancel_response = requests.post(
+            cancel_url,
+            headers=headers,
+            json={"reason": "Cancelled by user"}
+        )
+
+        print("PAYPAL REQUEST", cancel_url)
+        print("PAYPAL RESPONSE STATUS", cancel_response.status_code)
+        print("PAYPAL RESPONSE CONTENT", cancel_response.content)
+
+        if cancel_response.status_code not in [204, 200]:
+            return jsonify({
+                "success": False,
+                "error": f"Failed to cancel PayPal subscription. Status: {cancel_response.status_code}"
+            }), 500
+
+        # Update subscription status in Supabase
+        now = datetime.datetime.utcnow()
         supabase.table('subscriptions')\
             .update({
                 'status': 'cancelled',
-                'updated_at': datetime.datetime.utcnow().isoformat()
+                'updated_at': now.isoformat(),
+                'cancelled_at': now.isoformat()
             })\
-            .eq('user_id', user_id)\
-            .eq('status', 'active')\
+            .eq('id', subscription_id)\
             .execute()
 
         return jsonify({
@@ -1245,7 +1373,10 @@ def cancel_subscription():
 
     except Exception as e:
         print(f"Error cancelling subscription: {str(e)}")
-        return jsonify({"error": "Failed to cancel subscription"}), 500
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 def check_user_credits(user_id):
     """Check if user has credits in Supabase"""
@@ -1335,6 +1466,70 @@ def create_paypal_subscription():
     except Exception as e:
         print(f"Error creating subscription: {str(e)}")
         return jsonify({"error": "Failed to create subscription"}), 500
+
+@app.route('/api/users/profile', methods=['PUT', 'OPTIONS'])
+def update_user_profile():
+    """Update user profile"""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+        response.headers.add('Access-Control-Allow-Methods', 'PUT,OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    try:
+        user_id = request.headers.get('X-User-Id')
+        if not user_id:
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
+
+        data = request.get_json()
+        if not data or 'full_name' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing full_name in request body"
+            }), 400
+
+        # Update user metadata in Supabase
+        update_result = supabase.auth.admin.update_user_by_id(
+            user_id,
+            {"user_metadata": {"name": data['full_name']}}
+        )
+
+        if not update_result.user:
+            return jsonify({
+                "success": False,
+                "error": "Failed to update user profile"
+            }), 500
+
+        # Get updated user data from Supabase
+        user_response = supabase.auth.admin.get_user_by_id(user_id)
+        if not user_response.user:
+            return jsonify({
+                "success": False,
+                "error": "Failed to fetch updated user data"
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "message": "Profile updated successfully",
+            "data": {
+                "id": user_response.user.id,
+                "email": user_response.user.email,
+                "user_metadata": user_response.user.user_metadata,
+                "app_metadata": user_response.user.app_metadata
+            }
+        })
+
+    except Exception as e:
+        print(f"Error updating user profile: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 def main():
     """Main function to run the application"""

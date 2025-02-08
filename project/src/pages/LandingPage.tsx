@@ -249,6 +249,10 @@ function LandingPage() {
                   <CheckCircle className="w-5 h-5 text-indigo-600" />
                   <span>Basic AI optimization</span>
                 </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-indigo-600" />
+                  <span>Basic cover letter generation</span>
+                </li>
               </ul>
               <Link 
                 to="/signup" 
@@ -262,7 +266,7 @@ function LandingPage() {
             <div className="border rounded-2xl p-8 hover:shadow-lg transition-shadow">
               <h3 className="text-2xl font-bold mb-4">Pay as You Go</h3>
               <p className="text-gray-600 mb-6">For occasional job seekers</p>
-              <div className="text-4xl font-bold mb-6">$1<span className="text-xl font-normal">/try</span></div>
+              <div className="text-4xl font-bold mb-6">$1<span className="text-xl font-normal">/credit</span></div>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-indigo-600" />
@@ -271,6 +275,10 @@ function LandingPage() {
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-indigo-600" />
                   <span>Full AI optimization</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-indigo-600" />
+                  <span>Cover letter generation</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-indigo-600" />
@@ -290,9 +298,12 @@ function LandingPage() {
               <div className="absolute top-4 right-4 bg-indigo-600 text-white text-sm px-3 py-1 rounded-full">
                 Most Popular
               </div>
-              <h3 className="text-2xl font-bold mb-4">Pro</h3>
+              <h3 className="text-2xl font-bold mb-4">Pro Monthly</h3>
               <p className="text-gray-600 mb-6">For active job seekers</p>
-              <div className="text-4xl font-bold mb-2">$29</div>
+              <div className="flex items-baseline mb-2">
+                <div className="text-4xl font-bold">$19.98</div>
+                <div className="text-lg text-gray-500 line-through ml-2">$29.98</div>
+              </div>
               <p className="text-sm text-gray-600 mb-6">50 credits per month</p>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center gap-2">
@@ -305,7 +316,19 @@ function LandingPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-indigo-600" />
-                  <span>Priority support</span>
+                  <span>Smart cover letter generation</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-indigo-600" />
+                  <span>Interview preparation insights</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-indigo-600" />
+                  <span>Skill gap analysis</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-indigo-600" />
+                  <span>Priority email support</span>
                 </li>
               </ul>
               <Link 
@@ -317,18 +340,25 @@ function LandingPage() {
             </div>
 
             {/* Annual Plan */}
-            <div className="border-2 border-green-600 rounded-2xl p-8 hover:shadow-lg transition-shadow relative bg-green-50">
+            <div className="border-2 border-green-600 rounded-2xl p-8 hover:shadow-lg transition-shadow relative">
               <div className="absolute top-4 right-4 bg-green-600 text-white text-sm px-3 py-1 rounded-full">
                 Best Value
               </div>
-              <h3 className="text-2xl font-bold mb-4">Annual</h3>
+              <h3 className="text-2xl font-bold mb-4">Annual Plan</h3>
               <p className="text-gray-600 mb-6">For serious job seekers</p>
-              <div className="text-4xl font-bold mb-2">$299</div>
-              <p className="text-sm text-gray-600 mb-6">Unlimited credits for 1 year</p>
+              <div className="flex items-baseline mb-2">
+                <div className="text-4xl font-bold">$219.78</div>
+                <div className="text-lg text-gray-500 line-through ml-2">$359.76</div>
+              </div>
+              <p className="text-sm text-green-600 font-medium mb-6">Save $149.98/year</p>
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>Unlimited optimizations</span>
+                  <span className="font-medium text-green-600">Unlimited Credits</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span>Everything in Pro, plus:</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
@@ -336,11 +366,15 @@ function LandingPage() {
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>24/7 Priority support</span>
+                  <span>Industry-specific insights</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-600" />
-                  <span>Save $49/month</span>
+                  <span>24/7 priority support</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span>Save $149.98 per year</span>
                 </li>
               </ul>
               <Link 
