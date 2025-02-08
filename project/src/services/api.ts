@@ -235,35 +235,6 @@ function base64ToBlob(base64: string, type: string): Blob {
   return new Blob(byteArrays, { type });
 }
 
-// Supabase database operations
-export const saveJobApplication = async (
-  userId: string,
-  jobTitle: string,
-  company: string,
-  jobDescription: string,
-  jobUrl: string,
-  resumeId?: string
-) => {
-  const { data, error } = await supabase
-    .from('job_applications')
-    .insert([
-      {
-        user_id: userId,
-        resume_id: resumeId,
-        job_title: jobTitle,
-        company,
-        job_description: jobDescription,
-        job_url: jobUrl,
-        status: 'pending'
-      }
-    ])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-};
-
 export const getJobApplications = async (userId: string) => {
   const response = await fetch(`${API_URL}/api/jobs`, {
     method: 'GET',

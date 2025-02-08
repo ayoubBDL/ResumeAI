@@ -19,10 +19,6 @@ import { ToastProvider } from './context/ToastContext';
 import { CreditsProvider } from './context/CreditsContext';
 import Settings from './pages/Settings';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 interface PrivateRouteProps {
   children: React.ReactNode;
