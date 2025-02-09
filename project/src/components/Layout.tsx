@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FileText, BookmarkCheck, LogOut, Home, Settings, CreditCard } from 'lucide-react';
+import { FileText, BookmarkCheck, LogOut, Home, Settings, CreditCard, Menu, X } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 const navigation = [
@@ -34,6 +34,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -46,8 +47,28 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className="lg:hidden fixed top-4 left-4 p-2 rounded-md text-gray-600 z-50 bg-white shadow-sm"
+      >
+        {isSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+      </button>
+
+      {/* Backdrop for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 lg:hidden z-40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 w-64 bg-white border-r">
+      <div
+        className={`fixed inset-y-0 left-0 w-64 bg-white border-r transform transition-transform duration-300 ease-in-out z-50 ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-center h-24 px-4 border-b">
@@ -55,22 +76,23 @@ export default function Layout({ children }: LayoutProps) {
               <img
                 src={logo}
                 alt="ResumeAI Logo"
-                className="h-[100px] w-[100px] object-contain"
+                className="h-[150px] w-[150px]  object-contain"
               />
             </Link>
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-2 py-4 space-y-1">
+          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const Icon = item.icon;
               return (
                 <Link
                   key={item.name}
                   to={item.href}
-                  className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  className="flex items-center px-3 py-3 text-base font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  onClick={() => setIsSidebarOpen(false)}
                 >
-                  <Icon className="h-5 w-5 mr-3" />
+                  <Icon className="h-6 w-6 mr-3" />
                   {item.name}
                 </Link>
               );
@@ -80,17 +102,20 @@ export default function Layout({ children }: LayoutProps) {
           {/* Footer */}
           <div className="flex-shrink-0 p-4 border-t">
             <button
-              onClick={() => navigate('/settings')}
-              className="flex items-center w-full px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"
+              onClick={() => {
+                navigate('/settings');
+                setIsSidebarOpen(false);
+              }}
+              className="flex items-center w-full px-3 py-3 text-base font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900"
             >
-              <Settings className="h-5 w-5 mr-3" />
+              <Settings className="h-6 w-6 mr-3" />
               Settings
             </button>
             <button
               onClick={handleSignOut}
-              className="flex items-center w-full px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"
+              className="flex items-center w-full px-3 py-3 text-base font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900"
             >
-              <LogOut className="h-5 w-5 mr-3" />
+              <LogOut className="h-6 w-6 mr-3" />
               Logout
             </button>
           </div>
@@ -98,9 +123,11 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Main Content */}
-      <div className="pl-64">
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {children}
+      <div className={`lg:ml-64 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
+        <main className="p-6">
+            <div className="w-full p-6">
+              {children}
+            </div>
         </main>
       </div>
     </div>
