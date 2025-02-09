@@ -65,7 +65,7 @@ class OpenAIOptimizer:
          print("[OpenAI] Sending request to OpenAI API...")
 
          optimization_prompt = f"""
-            Please optimize this resume and provide improvement suggestions. Format your response in clear sections as follows:
+            Please optimize this resume and provide improvement suggestions. ‼️ Write ALL content in the DETECTED LANGUAGE from Job description. Format your response in clear sections as follows:
 
             1. First, provide the optimized resume content with proper formatting.
 
@@ -103,6 +103,7 @@ class OpenAIOptimizer:
 
          CRITICAL - ABSOLUTELY REQUIRED RULES:
          1. JOB MATCHING (HIGHEST PRIORITY):
+            ‼️ Write ALL content in the DETECTED LANGUAGE from Job description
             ‼️ Analyze the job description thoroughly
             ‼️ Identify key requirements, skills, and qualifications
             ‼️ Reorganize and emphasize resume content to match job requirements
@@ -125,6 +126,7 @@ class OpenAIOptimizer:
          - Use bullet points (•) for experience and skills
          - Consistent spacing
          - No tables or columns
+         - Directly start with Name of the candidate.
 
          PART 2: IMPROVEMENT ANALYSIS
          ===========================
