@@ -231,7 +231,7 @@ def search_similar_jobs():
             "error": str(e)
         }), 500
 
-@app.route('/optimize', methods=['POST'])
+@app.route('/api/optimize', methods=['POST'])
 def optimize_resume():
     try:
         user_id = request.headers.get('X-User-Id')
@@ -256,13 +256,12 @@ def optimize_resume():
 
         # Get job details from form data
         job_url = request.form.get('job_url')
+        job_description = request.form.get('job_description')
         
         # Extract job details from LinkedIn URL if available
         job_title = None
         company = None
-        job_description = None
         
-        print("[OpenAI] JOB DESCR...job_url :", job_url)
         if job_url and 'linkedin.com' in job_url:
             try:
                 scraper = JobScraper()
@@ -271,10 +270,13 @@ def optimize_resume():
                     job_title = job_details.get('job_title')
                     company = job_details.get('company')
                     job_description = job_details.get('job_description')
-
             except Exception as e:
                 print(f"Error extracting job details: {str(e)}")
-                # Continue without job details if extraction fails
+        elif job_description:
+            # If we only have job description, proceed without title/company
+            print(f"Processing with job description only")
+        else:
+            return jsonify({'error': 'Please provide either a job URL or description'}), 400
 
         # Extract text from PDF
         pdf_generator = PDFGenerator()
@@ -368,10 +370,10 @@ def optimize_resume():
                 resume_id = resume_result.data[0]['id']
 
                 # Create job application if we have job details
-                if job_url and job_title and company:
+                if job_description:
                     print(f"Creating job application with details:", {
-                        'job_title': job_title,
-                        'company': company,
+                        'job_title': job_title or 'Untitled Position',
+                        'company': company or 'Unknown Company',
                         'has_description': bool(job_description)
                     })
                     
@@ -379,8 +381,8 @@ def optimize_resume():
                         job_data = {
                             'user_id': user_id,
                             'resume_id': resume_id,
-                            'job_title': job_title,
-                            'company': company,
+                            'job_title': job_title or 'Untitled Position',
+                            'company': company or 'Unknown Company',
                             'job_description': job_description,
                             'job_url': job_url,
                             'status': 'pending'

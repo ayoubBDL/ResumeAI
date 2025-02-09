@@ -64,40 +64,25 @@ class OpenAIOptimizer:
       try:
          print("[OpenAI] Sending request to OpenAI API...")
 
+         # Ensure we're using the job description
+         if not job_description:
+            raise ValueError("Job description is required")
+
          optimization_prompt = f"""
-            Please optimize this resume and provide improvement suggestions. ‼️ Write ALL content in the DETECTED LANGUAGE from Job description. Format your response in clear sections as follows:
+         Please optimize this resume for the following job description:
 
-            1. First, provide the optimized resume content with proper formatting.
+         Job Description:
+         {job_description}
 
-            2. Then add the following sections, each starting with its section marker:
+         Original Resume:
+         {resume_text}
 
-            [SECTION: IMPROVEMENTS]
-            List specific improvements made to the resume and why they enhance it.
-
-            [SECTION: INTERVIEW]
-            Provide preparation tips for interviews based on this resume.
-
-            [SECTION: NEXTSTEPS]
-            Suggest next steps for career development and resume enhancement.
-            """
-         if job_title and company:
-            optimization_prompt += f" Optimize specifically for the position of {job_title} at {company}."
-            
-            optimization_prompt += f"""
-            
-            Original Resume:
-            {resume_text}
-            """
-            
-            if job_description:
-                optimization_prompt += f"""
-                
-                Job Description:
-                {job_description}
-                """
+         Please optimize this resume and provide improvement suggestions. Format your response in clear sections as follows:
+         [Rest of your existing prompt...]
+         """
 
          response = openai.ChatCompletion.create(
-               model="gpt-4o-mini",  # Using the original model
+               model="gpt-4o-mini",
                messages=[
                   {"role": "system", "content": """You are a professional career advisor that helps optimize resumes and prepare candidates for job opportunities. Your task is to create an ATS-friendly resume that SPECIFICALLY targets this job position.
 

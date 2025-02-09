@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
   const [jobUrl, setJobUrl] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
@@ -78,6 +79,7 @@ function Dashboard() {
   const resetForm = () => {
     setFile(null);
     setJobUrl('');
+    setJobDescription('');
     setUploadStatus('');
     setProgress(0);
     if (fileInputRef.current) {
@@ -91,7 +93,7 @@ function Dashboard() {
 
     try {
       setIsUploading(true);
-      setUploadStatus('');  // Clear any previous status
+      setUploadStatus('');
 
       // Check credits before optimization
       const userCredits = await getUserCredits();
@@ -107,20 +109,21 @@ function Dashboard() {
 
       const formData = new FormData();
       formData.append('resume', file);
+      
+      // Add either job URL or description
       if (jobUrl) {
         formData.append('job_url', jobUrl);
+      } else if (jobDescription) {
+        formData.append('job_description', jobDescription);
+      } else {
+        throw new Error('Please provide either a job URL or description');
       }
 
       const resume = await optimizeResume(formData);
       resetForm();
       
-      // Update credits immediately after optimization
       await forceUpdate();
-      
-      // Show success toast
       showToast('Resume optimized successfully!', 'success');
-      
-      // Reload recent resumes
       await loadRecentResumes();
     } catch (error) {
       console.error('Error optimizing resume:', error);
@@ -210,20 +213,39 @@ function Dashboard() {
 
             <div>
               <label htmlFor="job-url" className="block text-sm font-medium text-gray-700">
-                LinkedIn Job URL *
+                LinkedIn Job URL or Job Description *
               </label>
-              <div className="mt-1">
+              <div className="mt-1 space-y-4">
                 <input
                   type="url"
                   name="job-url"
                   id="job-url"
-                  required
                   value={jobUrl}
                   onChange={(e) => setJobUrl(e.target.value)}
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   placeholder="https://www.linkedin.com/jobs/view/..."
                 />
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                    <div className="w-full border-t border-gray-300" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="px-2 bg-white text-sm text-gray-500">or</span>
+                  </div>
+                </div>
+                <textarea
+                  name="job-description"
+                  id="job-description"
+                  rows={4}
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md"
+                  placeholder="Paste the job description here..."
+                />
               </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Provide either a LinkedIn job URL or paste the job description
+              </p>
             </div>
 
             {isUploading && (

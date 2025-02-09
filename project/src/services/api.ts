@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
+import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_RESUME_API_URL;
 
@@ -47,7 +48,7 @@ export const optimizeResume = async (formData: FormData, onCreditsUpdate?: () =>
     }
 
     // Call the optimization endpoint
-    const response = await fetch(`${API_URL}/optimize`, {
+    const response = await fetch(`${API_URL}/api/optimize`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
