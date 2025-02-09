@@ -3,20 +3,19 @@ import { Button } from '@/components/ui/button';
 import { 
   User, 
   CreditCard, 
-  RefreshCcw, 
   CheckCircle2, 
   XCircle,
   Bell,
   Lock,
   Shield,
-  Mail} from 'lucide-react';
+  Mail,
+  Coins} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useCredits } from '@/context/CreditsContext';
 import axios from 'axios';
 import { useToast } from '@/context/ToastContext';
 import { subscriptionApi } from '@/api/subscription';
-
-
+import { Link } from 'react-router-dom';
 
 import { AlertDialog } from '@/components/AlertDialog';
 
@@ -122,12 +121,12 @@ export default function Settings() {
     if (cachedCredits) {
       try {
         const parsed = JSON.parse(cachedCredits);
-        updateCredits();
+        console.log("parsed", parsed);
       } catch (error) {
         console.error('Error parsing localStorage credits:', error);
       }
     }
-  }, [subscription, updateCredits]);
+  }, [subscription]);
 
   // Add these status checks at the top of the component
   const hasActiveSubscription = subscription?.has_subscription && 
@@ -360,7 +359,7 @@ export default function Settings() {
               </button>
             </div>
 
-            {/* Subscription Section - Now at the bottom */}
+            {/* Subscription Section */}
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <CreditCard className="h-5 w-5 text-gray-500 mr-2" />
@@ -385,16 +384,36 @@ export default function Settings() {
                   </div>
                 </div>
 
+                {/* Credits Display */}
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Coins className="h-5 w-5 text-yellow-500 mr-2" />
+                      <p className="text-sm font-medium text-gray-900">
+                        {subscription?.subscription?.plan_type === 'yearly' 
+                          ? "Unlimited Credits"
+                          : `${credits} Credits Available`}
+                      </p>
+                    </div>
+                    {credits !== null && credits <= 2 && (
+                      <Link
+                        to="/billing"
+                        className="inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Purchase Credits
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
                 {/* Only show cancel button if there's an active subscription */}
                 {hasActiveSubscription && (
-                  <>
-                    <Button 
-                      variant="destructive"
-                      onClick={() => setShowConfirmation(true)}
-                    >
-                      Cancel Subscription
-                    </Button>
-                  </>
+                  <Button 
+                    variant="destructive"
+                    onClick={() => setShowConfirmation(true)}
+                  >
+                    Cancel Subscription
+                  </Button>
                 )}
               </div>
             </div>

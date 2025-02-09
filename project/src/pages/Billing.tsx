@@ -153,6 +153,11 @@ export default function Billing() {
     });
   };
 
+  // Add this helper function at the top
+  const isCurrentPlan = (planType: string, subscription: any) => {
+    return subscription?.subscription?.status === 'active' && 
+           subscription?.subscription?.plan_type === planType;
+  };
 
   // Add these status checks at the top of the component
   const hasActiveSubscription = subscription?.subscription?.status === 'active' && 
@@ -202,7 +207,7 @@ export default function Billing() {
             <div
               key={plan.name}
               className={`relative rounded-2xl p-8 transition-all duration-300 hover:shadow-xl ${
-                subscription?.subscription?.plan_type === plan.plan_type
+                isCurrentPlan(plan.plan_type, subscription)
                   ? 'border-2 border-indigo-600 bg-gradient-to-b from-indigo-50 to-white'
                   : 'border border-gray-200 hover:border-indigo-300'
               }`}
@@ -252,30 +257,25 @@ export default function Billing() {
                 ))}
               </ul>
 
-              {
-                plan.plan_type === 'payg' ? (
-                  <Button
-                    onClick={() => handlePlanSelect(plan.plan_type)}
-                    className="w-full py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-                  >
-                    <DollarSign className="w-4 h-4" />
-                    Buy More Credits
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full mt-auto"
-                    onClick={() => handlePlanSelect(plan.plan_type)}
-                    disabled={
-                      subscription?.subscription?.plan_type === plan.plan_type
-                    }
-                  >
-                    {subscription?.subscription?.plan_type === plan.plan_type
-                      ? 'Current Plan'
-                      : 'Select Plan'}
-
-                  </Button>
-                )
-              }
+              {plan.plan_type === 'payg' ? (
+                <Button
+                  onClick={() => handlePlanSelect(plan.plan_type)}
+                  className="w-full py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Buy More Credits
+                </Button>
+              ) : (
+                <Button
+                  className="w-full mt-auto"
+                  onClick={() => handlePlanSelect(plan.plan_type)}
+                  disabled={isCurrentPlan(plan.plan_type, subscription)}
+                >
+                  {isCurrentPlan(plan.plan_type, subscription)
+                    ? 'Current Plan'
+                    : 'Select Plan'}
+                </Button>
+              )}
             </div>
           ))}
         </div>

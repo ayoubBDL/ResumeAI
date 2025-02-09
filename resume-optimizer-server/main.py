@@ -1101,16 +1101,15 @@ def get_subscription():
         if not user_id:
             return jsonify({"error": "User ID is required"}), 401
 
-        # Get subscription from Supabase first
+        # Get subscription from Supabase - now without status filter
         subscription_response = supabase.table('subscriptions')\
             .select('*')\
             .eq('user_id', user_id)\
-            .eq('status', 'active')\
             .order('created_at', desc=True)\
             .limit(1)\
             .execute()
 
-        # If no subscription found, return early
+        # If no subscription found at all, return early
         if not subscription_response.data or len(subscription_response.data) == 0:
             return jsonify({
                 "has_subscription": False,
@@ -1124,49 +1123,56 @@ def get_subscription():
         # If no PayPal subscription ID, return just the Supabase data
         if not paypal_subscription_id:
             return jsonify({
-                "has_subscription": True,
+                "has_subscription": subscription.get('status') == 'active',
                 "subscription": subscription
             })
 
-        # Now check PayPal status
-        access_token = generate_paypal_token()
-        if not access_token:
-            return jsonify({"error": "Failed to generate Paypal access token"}), 500
+        # Check PayPal status only if subscription was active
+        if subscription.get('status') == 'active':
+            access_token = generate_paypal_token()
+            if not access_token:
+                return jsonify({"error": "Failed to generate Paypal access token"}), 500
 
-        url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}"
-        headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {access_token}'
-        }
-        
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            paypal_status = response.json().get('status', '').lower()
+            url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}"
+            headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': f'Bearer {access_token}'
+            }
             
-            # If cancelled in PayPal but active in Supabase, update Supabase
-            if paypal_status in ['cancelled', 'suspended', 'expired']:
-                now = datetime.datetime.utcnow()
-                supabase.table('subscriptions')\
-                    .update({
-                        'status': paypal_status,
-                        'updated_at': now.isoformat(),
-                        'cancelled_at': now.isoformat()
-                    })\
-                    .eq('id', subscription.get('id'))\
-                    .execute()
+            response = requests.get(url, headers=headers)
 
-                return jsonify({
-                    "has_subscription": False,
-                    "subscription": subscription,
-                    "paypal_subscription": response.json()
-                })
+            if response.status_code == 200:
+                paypal_status = response.json().get('status', '').lower()
+                
+                # If cancelled in PayPal but active in Supabase, update Supabase
+                if paypal_status in ['cancelled', 'suspended', 'expired']:
+                    now = datetime.datetime.utcnow()
+                    supabase.table('subscriptions')\
+                        .update({
+                            'status': paypal_status,
+                            'updated_at': now.isoformat(),
+                            'cancelled_at': now.isoformat()
+                        })\
+                        .eq('id', subscription.get('id'))\
+                        .execute()
 
+                    return jsonify({
+                        "has_subscription": False,
+                        "subscription": subscription,
+                        "paypal_subscription": response.json()
+                    })
+
+            return jsonify({
+                "has_subscription": True,
+                "subscription": subscription,
+                "paypal_subscription": response.json()
+            })
+        
+        # For inactive subscriptions, just return the data without PayPal check
         return jsonify({
-            "has_subscription": True,
-            "subscription": subscription,
-            "paypal_subscription": response.json()
+            "has_subscription": False,
+            "subscription": subscription
         })
 
     except Exception as e:

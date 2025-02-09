@@ -3,7 +3,6 @@ import Layout from '../components/Layout';
 import { optimizeResume, getRecentResumes, getUserCredits, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 import { useToast } from '../context/ToastContext';
-import { useCredits } from '../context/CreditsContext';
 import { AlertDialog } from '@/components/AlertDialog';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,27 +15,14 @@ function Dashboard() {
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
-  const [loading, setLoading] = useState(true);
   const [creditError, setCreditError] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
-  const { forceUpdate } = useCredits();
   const navigate = useNavigate();
 
   useEffect(() => {
     loadRecentResumes();
-    const loadUserCredits = async () => {
-      try {
-        const userCredits = await getUserCredits();
-        // Removed setting credits state
-      } catch (error) {
-        console.error('Error loading user credits:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadUserCredits();
+    
   }, []);
 
   useEffect(() => {
@@ -119,10 +105,9 @@ function Dashboard() {
         throw new Error('Please provide either a job URL or description');
       }
 
-      const resume = await optimizeResume(formData);
+      await optimizeResume(formData);
       resetForm();
       
-      await forceUpdate();
       showToast('Resume optimized successfully!', 'success');
       await loadRecentResumes();
     } catch (error) {
@@ -297,8 +282,6 @@ function Dashboard() {
           </form>
         </div>
 
-        {/* Removed credits display */}
-
         {creditError && (
           <AlertDialog
             error={creditError.error}
@@ -309,7 +292,6 @@ function Dashboard() {
           />
         )}
 
-        {/* Recent Resumes Section */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-bold mb-4">Recent Resumes</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

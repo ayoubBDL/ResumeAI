@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useCredits } from '../context/CreditsContext';
-import { FileText, BookmarkCheck, LogOut, Coins, CreditCard, Home, Settings } from 'lucide-react';
+import { FileText, BookmarkCheck, LogOut, Home, Settings, CreditCard } from 'lucide-react';
 import logo from '../assets/logo.png';
-import axios from 'axios';
 
 const navigation = [
   {
@@ -33,66 +31,9 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-interface Subscription {
-  plan_type: string;
-  subscription?: {
-    plan_type: string;
-  };
-}
-
 export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, signOut } = useAuth();
-  const { credits, updateCredits } = useCredits();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchData = async () => {
-      try {
-        if (!user) {
-          navigate('/login');
-          return;
-        }
-
-        // Check if we have cached subscription data
-        const cachedSubscription = localStorage.getItem('user_subscription');
-        if (cachedSubscription) {
-          const parsed = JSON.parse(cachedSubscription);
-          const lastChecked = new Date(parsed.lastChecked);
-          const now = new Date();
-          // Only use cache if it's less than 5 minutes old
-          if (now.getTime() - lastChecked.getTime() < 5 * 60 * 1000) {
-            if (isMounted) {
-              setSubscription(parsed);
-              setLoading(false);
-            }
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        if (isMounted && axios.isAxiosError(error) && error.response?.status === 404) {
-          navigate('/billing');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    // Initial fetch
-    fetchData();
-
-    // Cleanup function
-    return () => {
-      isMounted = false;
-    };
-  }, [user, navigate]); // Only re-run when user or navigate changes
+  const { signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -127,11 +68,7 @@ export default function Layout({ children }: LayoutProps) {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                    location.pathname === item.href
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
+                  className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 >
                   <Icon className="h-5 w-5 mr-3" />
                   {item.name}
@@ -142,24 +79,6 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Footer */}
           <div className="flex-shrink-0 p-4 border-t">
-            <div className="flex items-center mb-4 px-2 py-2 text-sm text-gray-600">
-              <Coins className="h-5 w-5 mr-3 text-yellow-500" />
-              <span>
-                {subscription?.subscription?.plan_type === 'yearly' || subscription?.plan_type === 'yearly'
-                  ? "Unlimited Credits"
-                  : (credits !== null && credits > 0
-                    ? `${credits} Credits`
-                    : "No credits available")}
-              </span>
-            </div>
-            {credits !== null && credits <= 2 && subscription?.plan_type !== 'yearly' && subscription?.subscription?.plan_type !== 'yearly' && (
-              <Link
-                to="/billing"
-                className="w-full inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Purchase Credits
-              </Link>
-            )}
             <button
               onClick={() => navigate('/settings')}
               className="flex items-center w-full px-2 py-2 text-sm font-medium text-gray-600 rounded-md hover:bg-gray-50 hover:text-gray-900"
@@ -179,7 +98,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Main Content */}
-      <div>
+      <div className="pl-64">
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {children}
         </main>
