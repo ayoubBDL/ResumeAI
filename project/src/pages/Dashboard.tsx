@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Layout from '../components/Layout';
 import { optimizeResume, getRecentResumes, getUserCredits, type Resume } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 import { useToast } from '../context/ToastContext';

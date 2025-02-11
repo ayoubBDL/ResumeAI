@@ -16,41 +16,184 @@ class PDFGenerator:
         self._setup_custom_styles()
 
     def _setup_custom_styles(self):
-        # Heading style
+        """Set up all custom styles for the PDF"""
+        # Define colors
+        self.colors = {
+            'primary': colors.HexColor('#2C3E50'),
+            'secondary': colors.HexColor('#34495E'),
+            'text': colors.HexColor('#2D3748')
+        }
+
+        # Remove existing styles if they exist
+        style_names = ['Name', 'JobTitle', 'ContactInfo', 'SectionHeading', 'NormalText', 
+                      'BulletText', 'CompanyName', 'BoldText']
+        for style_name in style_names:
+            if style_name in self.styles:
+                del self.styles[style_name]
+
+        # Name style - centered
         self.styles.add(ParagraphStyle(
-            name='CustomHeading',
+            name='Name',
             parent=self.styles['Heading1'],
-            fontSize=14,
-            spaceAfter=20,
-            textColor=colors.HexColor('#2D3748')
-        ))
-
-        # Section style
-        self.styles.add(ParagraphStyle(
-            name='Section',
-            parent=self.styles['Heading2'],
-            fontSize=12,
+            fontSize=20,
             spaceAfter=12,
-            textColor=colors.HexColor('#4A5568')
+            textColor=self.colors['primary'],
+            fontName='Helvetica-Bold',
+            alignment=1  # Center alignment
         ))
 
-        # Body text style
+        # Job Title style
         self.styles.add(ParagraphStyle(
-            name='CustomBody',
+            name='JobTitle',
+            parent=self.styles['Normal'],
+            fontSize=12,
+            spaceAfter=10,
+            textColor=self.colors['secondary'],
+            fontName='Helvetica-Bold',
+            alignment=1
+        ))
+
+        # Contact info style
+        self.styles.add(ParagraphStyle(
+            name='ContactInfo',
             parent=self.styles['Normal'],
             fontSize=10,
-            leading=14,
-            spaceAfter=8,
-            textColor=colors.HexColor('#2D3748')
+            spaceAfter=3,
+            fontName='Helvetica',
+            textColor=self.colors['secondary'],
+            alignment=1
         ))
 
-    def create_pdf_from_text(self, text):
-        """Convert text to PDF using ReportLab with enhanced formatting"""
-        try:
-            # Create a BytesIO buffer instead of a temporary file
-            buffer = io.BytesIO()
+        # Section Heading style (for ***TITLE***)
+        self.styles.add(ParagraphStyle(
+            name='SectionHeading',
+            parent=self.styles['Heading2'],
+            fontSize=12,
+            spaceBefore=12,
+            spaceAfter=4,
+            textColor=self.colors['primary'],
+            fontName='Helvetica-Bold'
+        ))
+
+        # Sub Heading style (for **Title**)
+        self.styles.add(ParagraphStyle(
+            name='SubHeading',
+            parent=self.styles['Normal'],
+            fontSize=11,
+            spaceBefore=6,
+            spaceAfter=4,
+            textColor=self.colors['secondary'],
+            fontName='Helvetica-Bold'
+        ))
+
+        # Bold Text style (for *text*)
+        self.styles.add(ParagraphStyle(
+            name='BoldText',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            spaceAfter=4,
+            fontName='Helvetica-Bold',
+            textColor=self.colors['text']
+        ))
+
+        # Normal text style
+        self.styles.add(ParagraphStyle(
+            name='NormalText',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            spaceAfter=4,
+            fontName='Helvetica'
+        ))
+
+        # Bullet point style
+        self.styles.add(ParagraphStyle(
+            name='BulletText',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            spaceAfter=2,
+            fontName='Helvetica',
+            leading=12,
+            leftIndent=20
+        ))
+
+    def _is_section_header(self, line, previous_line="", next_line=""):
+        """
+        Determine if a line is a section header based on its characteristics and context.
+        """
+        line = line.strip()
+        if not line:
+            return False
             
-            # Set up the document with proper margins
+        # Skip obvious non-headers
+        if line.startswith('•') or line.startswith('-') or ':' in line:
+            return False
+        
+        # Check length (most section headers are 1-4 words)
+        words = line.split()
+        if len(words) > 4:
+            return False
+            
+        # Check formatting characteristics
+        is_all_caps = line.isupper()
+        is_title_case = line.istitle()
+        
+        # Check context
+        next_line = next_line.strip()
+        previous_line = previous_line.strip()
+        
+        # Headers often have different formatting than surrounding text
+        followed_by_bullet = next_line.startswith('•') or next_line.startswith('-')
+        preceded_by_space = not previous_line
+        
+        # Scoring system for header likelihood
+        score = 0
+        if is_all_caps:
+            score += 2
+        if is_title_case:
+            score += 1
+        if followed_by_bullet:
+            score += 2
+        if preceded_by_space:
+            score += 1
+        if len(words) <= 2:
+            score += 1
+            
+        return score >= 3
+
+    def _process_bold_text(self, text):
+        """Process bold text markers in the content"""
+        # Handle **text** format
+        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+        # Handle __text__ format
+        text = re.sub(r'__(.*?)__', r'<b>\1</b>', text)
+        return text
+
+    def _process_text_formatting(self, line: str) -> tuple[str, str]:
+        """Process text formatting and return the processed text and appropriate style name"""
+        
+        line = line.strip()
+        
+        # Handle section titles (***TITLE***)
+        if line.startswith('***') and line.endswith('***'):
+            title = line[3:-3].strip()  # Remove *** from both ends
+            return title, 'SectionHeading'
+        
+        # Handle sub-titles (**Title**)
+        if line.startswith('**') and line.endswith('**'):
+            subtitle = line[2:-2].strip()  # Remove ** from both ends
+            return subtitle, 'SubHeading'
+        
+        # Handle bold text (*text*)
+        if '*' in line:
+            # Find all text between * and replace with just the text
+            line = re.sub(r'\*(.*?)\*', r'\1', line)
+            return line, 'BoldText'
+        
+        return line, 'NormalText'
+
+    def create_pdf_from_text(self, text):
+        try:
+            buffer = io.BytesIO()
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=letter,
@@ -60,184 +203,76 @@ class PDFGenerator:
                 bottomMargin=0.75*inch
             )
             
-            # Create custom styles
-            styles = getSampleStyleSheet()
-            
-            # Name style
-            styles.add(ParagraphStyle(
-                name='Name',
-                parent=styles['Heading1'],
-                fontSize=18,
-                spaceAfter=12,
-                textColor=colors.HexColor('#2C3E50'),
-                fontName='Helvetica-Bold'
-            ))
-            
-            # Section heading style
-            styles.add(ParagraphStyle(
-                name='SectionHeading',
-                parent=styles['Heading2'],
-                fontSize=14,
-                spaceBefore=12,
-                spaceAfter=8,
-                textColor=colors.HexColor('#2C3E50'),
-                fontName='Helvetica-Bold'
-            ))
-            
-            # Normal text style
-            styles.add(ParagraphStyle(
-                name='NormalText',
-                parent=styles['Normal'],
-                fontSize=11,
-                spaceAfter=6,
-                fontName='Helvetica',
-                leading=14
-            ))
-            
-            # Contact info style
-            styles.add(ParagraphStyle(
-                name='ContactInfo',
-                parent=styles['Normal'],
-                fontSize=11,
-                spaceAfter=2,
-                fontName='Helvetica',
-                textColor=colors.HexColor('#34495E')
-            ))
-            
-            # Parse the text and build the document
             story = []
             lines = text.split('\n')
-            current_section = []
-            in_contact_section = False
-            skip_next = False
+            is_first_content = True
             
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
                 
-                # Skip ATS header and separator lines
-                if "ATS-FRIENDLY" in line or "=" * 10 in line:
+                # Skip age line
+                if re.match(r'^\d+\s*yo\s*$', line, re.IGNORECASE):
                     continue
-                
-                # Remove markers and clean up the text
-                line = re.sub(r'^PART \d+:', '', line)  # Remove "PART X:" headers
-                line = re.sub(r'\*\*|\#\#', '', line)   # Remove ** and ## markers
-                line = line.strip()
-                if not line:
-                    continue
-                
-                # Handle different sections
-                if "PROFESSIONAL SUMMARY" in line.upper():
-                    story.append(Paragraph("Summary", styles['SectionHeading']))
-                elif "PROFESSIONAL EXPERIENCE" in line.upper():
-                    story.append(Paragraph("Experience", styles['SectionHeading']))
-                elif "EDUCATION" in line.upper():
-                    story.append(Paragraph("Education", styles['SectionHeading']))
-                elif "SKILLS" in line.upper():
-                    story.append(Paragraph("Skills", styles['SectionHeading']))
-                elif "CONTACT SECTION" in line.upper():
-                    continue  # Skip this header
-                elif line.startswith('[LinkedIn]'):
-                    # Clean up LinkedIn URL
-                    url = re.search(r'\((.*?)\)', line).group(1)
-                    story.append(Paragraph(f'LinkedIn: {url}', styles['ContactInfo']))
-                elif ':' in line and not in_contact_section:
-                    # Handle contact info
-                    label, value = line.split(':', 1)
-                    story.append(Paragraph(
-                        f'{label.strip()}: {value.strip()}',
-                        styles['ContactInfo']
-                    ))
-                elif line.startswith('•') or line.startswith('-'):
-                    # Add bullet point
-                    current_section.append(line[1:].strip())
-                else:
-                    # Add normal paragraph
-                    if current_section:
-                        # Add any collected bullet points before adding new paragraph
-                        story.append(ListFlowable(
-                            [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
-                            bulletType='bullet',
-                            leftIndent=20,
-                            spaceBefore=4,
-                            spaceAfter=4
-                        ))
-                        current_section = []
                     
-                    # Check if this is the name (first non-header line)
-                    if not story:
-                        story.append(Paragraph(line, styles['Name']))
-                    else:
-                        story.append(Paragraph(line, styles['NormalText']))
-            
-            # Add any remaining bullet points
-            if current_section:
-                story.append(ListFlowable(
-                    [ListItem(Paragraph(item, styles['NormalText'])) for item in current_section],
-                    bulletType='bullet',
-                    leftIndent=20,
-                    spaceBefore=4,
-                    spaceAfter=4
-                ))
-            
-            # Build PDF into the buffer
+                # Process the line formatting
+                processed_text, style_name = self._process_text_formatting(line)
+                
+                # Handle first line (name) specially
+                if is_first_content:
+                    story.append(Paragraph(processed_text, self.styles['Name']))
+                    is_first_content = False
+                    continue
+                
+                # Add the processed text with appropriate style
+                story.append(Paragraph(processed_text, self.styles[style_name]))
+                
+                # Add extra space after sections
+                if style_name == 'SectionHeading':
+                    story.append(Spacer(1, 8))
+                    
             doc.build(story)
-            
-            # Get the PDF bytes
-            pdf_bytes = buffer.getvalue()
-            buffer.close()
-            
-            return pdf_bytes
+            return buffer.getvalue()
             
         except Exception as e:
             print(f"Error creating PDF: {str(e)}")
             raise
-
+            
     def clean_text(self, text):
         """Clean extracted text by removing extra spaces and formatting"""
-        # Split into lines and clean each line
         lines = text.splitlines()
         cleaned_lines = []
         
         for line in lines:
-            # Remove multiple spaces and tabs
             cleaned_line = ' '.join(word for word in line.split() if word)
             if cleaned_line:
                 cleaned_lines.append(cleaned_line)
         
-        # Join lines back together
         return '\n'.join(cleaned_lines)
-        
+
     def extract_text_from_pdf(self, file_storage):
+        """Extract text from uploaded PDF file"""
         try:
             print(f"[PDF Extraction] Starting PDF text extraction for file: {file_storage.filename}")
             
-            # Read the file into a bytes buffer
             pdf_bytes = io.BytesIO(file_storage.read())
             print("[PDF Extraction] Successfully read file into buffer")
             
             text_content = []
-            # Use pdfplumber for better text extraction
             with pdfplumber.open(pdf_bytes) as pdf:
                 num_pages = len(pdf.pages)
                 print(f"[PDF Extraction] PDF has {num_pages} pages")
                 
                 for i, page in enumerate(pdf.pages):
-                    # Extract text with better formatting
                     page_text = page.extract_text(layout=True)
                     if page_text:
-                        # Clean the text before adding to content
                         cleaned_text = self.clean_text(page_text)
                         text_content.append(cleaned_text)
                     print(f"[PDF Extraction] Extracted {len(page_text) if page_text else 0} characters from page {i+1}")
             
-            # Join all pages with proper spacing
             final_text = "\n\n".join(text_content).strip()
-            
             print(f"[PDF Extraction] Total extracted text length: {len(final_text)} characters")
-            print("[PDF Extraction] Complete extracted text:")
-            print("=" * 80)
             
             return final_text
             
@@ -245,18 +280,15 @@ class PDFGenerator:
             print(f"[PDF Extraction ERROR] Error extracting text from PDF: {str(e)}")
             raise Exception("Failed to extract text from PDF file")
 
-
     async def generate(self, content: dict) -> str:
+        """Generate a PDF file from the optimized resume content"""
         try:
-            # Create output directory if it doesn't exist
             output_dir = "downloads"
             os.makedirs(output_dir, exist_ok=True)
 
-            # Generate unique filename
             filename = f"resume_{uuid.uuid4().hex[:8]}.pdf"
             filepath = os.path.join(output_dir, filename)
 
-            # Create the PDF document
             doc = SimpleDocTemplate(
                 filepath,
                 pagesize=letter,
@@ -266,81 +298,60 @@ class PDFGenerator:
                 bottomMargin=72
             )
 
-            # Build the PDF content
             story = []
-
-            # Add the optimized resume content
             resume_lines = content["optimized_resume"].split('\n')
-            current_section = None
 
             for line in resume_lines:
                 line = line.strip()
                 if not line:
                     continue
 
-                # Check if this is a section header
                 if line.isupper() and len(line) < 50:
-                    current_section = line
-                    story.append(Paragraph(line, self.styles['CustomHeading']))
+                    story.append(Paragraph(line, self.styles['SectionHeading']))
                     story.append(Spacer(1, 12))
                 else:
-                    # Regular content
-                    story.append(Paragraph(line, self.styles['CustomBody']))
+                    story.append(Paragraph(line, self.styles['NormalText']))
                     story.append(Spacer(1, 8))
 
-            # Build the PDF
             doc.build(story)
-
             return filepath
 
         except Exception as e:
             raise Exception(f"Failed to generate PDF: {str(e)}")
 
     def create_cover_letter_pdf(self, text: str) -> bytes:
-        """Create a PDF from cover letter text with proper formatting"""
+        """Create a PDF from cover letter text"""
         try:
-            # Create a BytesIO buffer
             buffer = io.BytesIO()
             
-            # Set up the document with proper margins for a cover letter
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=letter,
-                leftMargin=1*inch,  # Standard business letter margins
+                leftMargin=1*inch,
                 rightMargin=1*inch,
                 topMargin=1*inch,
                 bottomMargin=1*inch
             )
             
-            # Create styles
             styles = getSampleStyleSheet()
-            
-            # Normal text style
             normal_style = ParagraphStyle(
                 'CoverLetterBody',
                 parent=styles['Normal'],
                 fontSize=12,
                 fontName='Helvetica',
-                leading=16,  # Line spacing
+                leading=16,
                 spaceBefore=12,
                 spaceAfter=12
             )
             
-            # Build the document
             story = []
-            
-            # Split text into paragraphs and add them
             paragraphs = text.strip().split('\n\n')
             for paragraph in paragraphs:
                 if paragraph.strip():
-                    # Replace single newlines with spaces, keep paragraph breaks
                     cleaned_paragraph = paragraph.replace('\n', ' ').strip()
                     story.append(Paragraph(cleaned_paragraph, normal_style))
             
-            # Build PDF
             doc.build(story)
-            
-            # Get PDF data
             pdf_data = buffer.getvalue()
             buffer.close()
             

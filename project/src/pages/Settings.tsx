@@ -82,7 +82,6 @@ export default function Settings() {
   });
   const provider = user?.app_metadata?.provider || 'email';
   const [cancelError, setCancelError] = useState<any>(null);
-  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   useEffect(() => {
     const fetchSubscriptionData = async () => {

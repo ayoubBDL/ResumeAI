@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getJobApplications, updateJobApplicationStatus, deleteJobApplication, JobApplication, getResumeDownloadUrl, downloadCoverLetter } from '../services/api';
+import { getJobApplications, updateJobApplicationStatus, deleteJobApplication, JobApplication, downloadCoverLetter } from '../services/api';
 import { format } from 'date-fns';
 import { Building2, Calendar, ExternalLink, Search, BookOpen, Download, FileText, Trash2 } from 'lucide-react';
 import AnalysisModal from '../components/AnalysisModal';
 import ConfirmModal from '../components/ConfirmModal';
 import { useToast } from '../context/ToastContext';
-import Layout from '../components/Layout';
 
 function SavedJobs() {
   const [isLoading, setIsLoading] = useState(true);

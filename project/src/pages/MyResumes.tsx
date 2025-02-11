@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { useAuth } from '../context/AuthContext';
 import { Resume, getRecentResumes } from '../services/api';
 import ResumeCard from '../components/ResumeCard';
 
 export default function MyResumes() {
-  const { user } = useAuth();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
