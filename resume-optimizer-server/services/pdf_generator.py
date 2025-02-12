@@ -212,8 +212,11 @@ class PDFGenerator:
                 if not line:
                     continue
                 
-                # Skip age line
-                if re.match(r'^\d+\s*yo\s*$', line, re.IGNORECASE):
+                # Skip separator lines and age
+                if (line.startswith('---') or 
+                    line.startswith('===') or 
+                    line == '---' or 
+                    re.match(r'^\d+\s*yo\s*$', line, re.IGNORECASE)):
                     continue
                     
                 # Process the line formatting

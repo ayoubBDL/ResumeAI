@@ -80,59 +80,54 @@ FORMAT RULES:
 - No tables or columns
 - Start directly with candidate's name
 
-PART 2: IMPROVEMENT ANALYSIS
-==========================
-Provide a detailed analysis in these sections:
+PART 2: DETAILED ANALYSIS
+=======================
+Provide a concise analysis in these key areas:
 
-[SECTION:CONTENT_OPTIMIZATION]
-• Language Alignment
-- Explain how terminology was matched to job description
-- Detail which phrases were rephrased and why
-- Highlight key terms that were prioritized
+[SECTION:OPTIMIZATION]
+• Content Improvements
+- How the resume was tailored to the job
+- Key skills and experiences highlighted
+- Quantifiable achievements added
 
-• Content Restructuring
-- Describe how experiences were reframed
-- Explain why certain projects were selected
-- Detail how technical skills were prioritized
+• Technical Alignment
+- Technologies matched to requirements
+- Technical skills prioritized
+- System/architecture experience highlighted
 
-• Impact Enhancement
-- Show before/after examples of strengthened bullets
-- Explain quantifiable metrics added
-- Highlight improved action verbs
+• Language Adaptation
+- Industry-specific terms used
+- Action verbs strengthened
+- Technical terminology aligned
 [/SECTION]
 
-[SECTION:TECHNICAL_MATCHING]
-• Skills Alignment
-- Map candidate's skills to job requirements
-- Identify strong matches and potential gaps
-- Explain technical terminology adjustments
+[SECTION:INTERVIEW_PREP]
+• Key Discussion Points
+- Technical projects to highlight
+- System design decisions to explain
+- Problem-solving examples
 
-• Project Selection
-- Justify chosen projects' relevance
-- Explain technical challenges highlighted
-- Detail how project descriptions were optimized
+• Technical Questions
+- Prepare for architecture discussions
+- Code implementation scenarios
+- Technology stack questions
 
-• Technical Focus
-- Describe emphasized technical capabilities
-- Explain framework/tool selection
-- Detail system architecture highlights
+• Experience Examples
+- Team collaboration stories
+- Leadership examples
+- Technical challenges overcome
 [/SECTION]
 
-[SECTION:INTERVIEW_PREPARATION]
-• Technical Discussion Points
-- Specific examples to elaborate in interviews
-- Technical challenges to highlight
-- Architecture decisions to explain
+[SECTION:NEXT_STEPS]
+• Skill Enhancement
+- Areas for improvement
+- Suggested certifications
+- Learning priorities
 
-• Experience Elaboration
-- Key projects to discuss in detail
-- Technical problems solved
-- Team collaboration examples
-
-• Skill Demonstration
-- Prepare code examples
-- System design scenarios
-- Technical decision justification
+• Portfolio Development
+- Project suggestions
+- Skills to demonstrate
+- Technical blog topics
 [/SECTION]
 
 FINAL CHECK - VERIFY:
@@ -207,12 +202,12 @@ FINAL CHECK - VERIFY:
             ‼️ Use similar terminology as the job description
             ‼️ Highlight experiences that directly relate to job requirements
             ‼️ Ensure technical skills match what's asked in the job
-            - **Summarize concisely**: Reduce each role’s responsibilities into two strong bullet points.  
+            - **Summarize concisely**: Reduce each role's responsibilities into two strong bullet points.  
             - **Prioritize impact**: Focus on the most significant contributions and achievements.  
             - **Use action verbs**: Ensure each bullet starts with a strong action verb.  
             - **Maintain structure**: Keep the formatting clean and consistent.  
             **Output Format for Experience Section:**  
-            **[Job Title] – Company name if there is one, otherwise leave blank it is critical !!DO NOT WRITE THE COMPANY NAME IF THERE IS NOT ONE!! - [Dates]**  
+            **[Job Title] – Company name if there is one, otherwise leave blank it is critical !!DO NOT WRITE THE COMPANY NAME IF THERE IS NOT ONE!! – [Dates]**  
 
 
          2. SECTION ORGANIZATION (STRICT ORDER):
@@ -220,9 +215,10 @@ FINAL CHECK - VERIFY:
            !! Make sure to write content in the DETECTED LANGUAGE !!
            !! Make sure to add *** for Titles of the sections and ** for smaller titles and * for bold text inside the sections !!
            !! TITLES OF THE SECTIONS MUST BE IN THE DETECTED LANGUAGE IT IS CRITICAL !!
+           !! CONTACT INFORMATION MUST BE IN THE DETECTED LANGUAGE IT IS CRITICAL !!
 
          3. LANGUAGE AND FORMATTING:
-            ‼️ Use CONSISTENT language throughout (French OR English, based on job description)
+            ‼️ Use CONSISTENT language throughout (based on job description Make sure to write in the DETECTED LANGUAGE!!)
             ‼️ Format dates according to language (French: "24 juin 2024", English: "June 24, 2024")
             ‼️ NO duplicate sections or titles
             ‼️ NO scattered projects - keep ALL projects in ONE section
@@ -245,62 +241,54 @@ FINAL CHECK - VERIFY:
          - No tables or columns
          - Directly start with Name of the candidate.
 
-         PART 2: IMPROVEMENT ANALYSIS
-         ===========================
-         Format the analysis EXACTLY as shown below, maintaining the exact structure and markers:
+         PART 2: DETAILED ANALYSIS
+         ========================
+         Provide a concise analysis in these key areas:
 
-         [SECTION:IMPROVEMENTS]
-         • Reorganized Content
-         - Restructured sections for better flow
-         - Enhanced readability and scannability
-         
-         • Enhanced Technical Skills
-         - Added relevant technologies from job description
-         - Prioritized key required skills
-         
-         • Strengthened Experience
-         - Added quantifiable metrics
-         - Highlighted leadership roles
-         
-         • Optimized Keywords
-         - Incorporated job-specific terms
-         - Added industry-standard variations
+         [SECTION:OPTIMIZATION]
+         • Content Improvements
+         - How the resume was tailored to the job
+         - Key skills and experiences highlighted
+         - Quantifiable achievements added
+
+         • Technical Alignment
+         - Technologies matched to requirements
+         - Technical skills prioritized
+         - System/architecture experience highlighted
+
+         • Language Adaptation
+         - Industry-specific terms used
+         - Action verbs strengthened
+         - Technical terminology aligned
          [/SECTION]
 
-         [SECTION:INTERVIEW]
-         • Technical Topics
-         - Key areas from job requirements
-         - System design considerations
-         
-         • Project Highlights
-         - Prepare STAR stories for key projects
-         - Focus on technical challenges solved
-         
-         • Key Questions
-         - Prepare for role-specific scenarios
-         - Technical implementation details
-         
-         • Discussion Points
-         - Team collaboration examples
-         - Code quality practices
+         [SECTION:INTERVIEW_PREP]
+         • Key Discussion Points
+         - Technical projects to highlight
+         - System design decisions to explain
+         - Problem-solving examples
+
+         • Technical Questions
+         - Prepare for architecture discussions
+         - Code implementation scenarios
+         - Technology stack questions
+
+         • Experience Examples
+         - Team collaboration stories
+         - Leadership examples
+         - Technical challenges overcome
          [/SECTION]
 
-         [SECTION:NEXTSTEPS]
-         • Skills Development
-         - Identify skill gaps
-         - Learning resources
-         
-         • Certifications
-         - Relevant technical certifications
-         - Industry-specific training
-         
-         • Portfolio Enhancement
+         [SECTION:NEXT_STEPS]
+         • Skill Enhancement
+         - Areas for improvement
+         - Suggested certifications
+         - Learning priorities
+
+         • Portfolio Development
          - Project suggestions
          - Skills to demonstrate
-         
-         • Industry Knowledge
-         - Technology trends
-         - Professional networking
+         - Technical blog topics
          [/SECTION]
 
          FINAL CHECK - VERIFY:

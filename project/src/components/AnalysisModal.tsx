@@ -9,86 +9,33 @@ interface AnalysisModalProps {
 export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisModalProps) {
   if (!isOpen) return null;
 
-  // Helper function to parse bullet points
-  const parseBulletPoints = (content: string) => {
-    if (!content) return [];
-    const lines = content.split('\n').map(line => line.trim()).filter(Boolean);
-    const points: { main: string; sub: string[] }[] = [];
-    let currentMain: { main: string; sub: string[] } | null = null;
+  // Helper function to parse sections
+  const parseSections = (content: string) => {
+    const sections = [];
+    const sectionRegex = /\[(OPTIMIZATION|INTERVIEW_PREP|NEXT_STEPS)\]([\s\S]*?)(?=\[(?:OPTIMIZATION|INTERVIEW_PREP|NEXT_STEPS)\]|\[\/SECTION\]|$)/g;
+    
+    let match;
+    while ((match = sectionRegex.exec(content)) !== null) {
+      const [, title, content] = match;
+      const cleanContent = content.trim()
+        .replace(/•\s*/g, '• ') // Normalize bullet points
+        .replace(/\[\/SECTION\]/g, '') // Remove section end markers
+        .trim();
 
-    lines.forEach(line => {
-      if (line.startsWith('•')) {
-        if (currentMain) {
-          points.push(currentMain);
-        }
-        currentMain = {
-          main: line.substring(1).trim(),
-          sub: []
-        };
-      } else if (line.startsWith('-') && currentMain) {
-        currentMain.sub.push(line.substring(1).trim());
-      }
-    });
-
-    if (currentMain) {
-      points.push(currentMain);
+      sections.push({
+        title: title.replace(/_/g, ' '),
+        content: cleanContent
+      });
     }
-
-    return points;
+    
+    return sections;
   };
 
-  // Helper function to get section content
-  const getSectionContent = (sectionName: string): string => {
-    const pattern = new RegExp(`\\[${sectionName}\\]([\\s\\S]*?)\\[\\/SECTION\\]`);
-    const match = analysis.match(pattern);
-    return match ? match[1].trim() : '';
-  };
-
-  // Helper function to render a section
-  const renderSection = (title: string, sectionName: string) => {
-    const content = getSectionContent(sectionName);
-    if (!content) return null;
-
-    const points = parseBulletPoints(content);
-
-    return (
-      <section className="bg-white rounded-lg shadow mb-4">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        </div>
-        <div className="p-4">
-          <ul className="space-y-4">
-            {points.map((point, index) => (
-              <li key={index} className="text-gray-700">
-                <div className="font-medium">{point.main}</div>
-                {point.sub.length > 0 && (
-                  <ul className="mt-2 ml-6 space-y-2">
-                    {point.sub.map((subPoint, subIndex) => (
-                      <li key={`${index}-${subIndex}`} className="text-gray-600 list-disc">
-                        {subPoint}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-    );
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  // Parse the sections
+  const sections = parseSections(analysis);
 
   return (
-    <div 
-      className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex"
-      onClick={handleBackdropClick}
-    >
+    <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex">
       <div className="relative w-full max-w-4xl m-auto bg-gray-50 rounded-lg shadow-xl">
         <div className="p-6">
           <button
@@ -104,9 +51,16 @@ export default function AnalysisModal({ isOpen, onClose, analysis }: AnalysisMod
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Resume Analysis</h2>
           
           <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-            {renderSection('Improvements', 'IMPROVEMENTS')}
-            {renderSection('Interview Preparation', 'INTERVIEW')}
-            {renderSection('Next Steps', 'NEXTSTEPS')}
+            {sections.map((section, index) => (
+              <section key={index} className="bg-white rounded-lg shadow mb-4">
+                <div className="p-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
+                </div>
+                <div className="p-4 whitespace-pre-wrap">
+                  {section.content}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
       </div>

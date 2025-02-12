@@ -40,7 +40,6 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
         throw new Error(data.error || 'Failed to get download URL');
       }
 
-      // Fetch the actual PDF content
       const pdfResponse = await fetch(data.url);
       if (!pdfResponse.ok) {
         throw new Error('Failed to download PDF');
@@ -52,7 +51,7 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       // Create a temporary link element to trigger download
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', `${resume.job_title || 'resume'}.pdf`);
+      link.setAttribute('download', `${resume.title || 'resume'}.pdf`);
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
@@ -69,7 +68,15 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
   };
 
   const handleViewAnalysis = () => {
-    console.log('[DEBUG] Opening analysis modal with data:', resume.analysis);
+    if (!resume.analysis) return;
+    
+    // Clean up the analysis text before opening modal
+    const cleanedAnalysis = resume.analysis
+      .split('FINAL CHECK - VERIFY:')[0] // Remove the final check section
+      .replace(/\*\*/g, '')  // Remove ** markers
+      .trim();
+      
+    console.log('[DEBUG] Opening analysis modal with data:', cleanedAnalysis);
     setIsAnalysisOpen(true);
   };
 
@@ -180,7 +187,7 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       <AnalysisModal
         isOpen={isAnalysisOpen}
         onClose={() => setIsAnalysisOpen(false)}
-        analysis={resume.analysis || ''}
+        analysis={resume.analysis ? resume.analysis.split('FINAL CHECK - VERIFY:')[0].replace(/\*\*/g, '').trim() : ''}
       />
 
       <ConfirmModal
