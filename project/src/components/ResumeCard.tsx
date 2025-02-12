@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Resume, deleteResume } from '../services/api';
 import AnalysisModal from './AnalysisModal';
 import ConfirmModal from './ConfirmModal';

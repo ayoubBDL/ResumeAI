@@ -1,7 +1,5 @@
 import { PayPalButtons } from "@paypal/react-paypal-js";
 
-const API_URL = import.meta.env.VITE_RESUME_API_URL || 'http://localhost:5050';
-
 export default function PaypalButton({ 
     onApprove, 
     onCancel,

@@ -63,7 +63,14 @@ export default function Checkout() {
       // Send subscription/credit purchase request to backend
       if (plan.plan_type === 'payg') {
         // Credit purchase
-
+        const response = await axios.post('/api/credits/purchase', {
+          orderId: data.orderID,
+          credits: credits,
+          amount: credits * 1,
+        }, {
+          headers: { 'X-User-Id': user?.id }
+        });
+        console.log("response", response);
         // Update credits in context and localStorage
         await updateCredits();
         
