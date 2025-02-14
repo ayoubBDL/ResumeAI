@@ -28,6 +28,7 @@ import logging
 from flask import Flask, request, jsonify, make_response, send_file
 from flask_cors import CORS
 from requests.auth import HTTPBasicAuth
+from waitress import serve 
 
 # Load environment variables
 load_dotenv()
