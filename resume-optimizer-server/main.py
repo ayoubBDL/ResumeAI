@@ -48,13 +48,14 @@ supabase: Client = create_client(supabase_url, supabase_key)
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {  # Allow all routes
-        "origins": ["http://localhost:5173"],
+        "origins": [os.getenv('CLIENT_URL')],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
         "supports_credentials": True,
         "expose_headers": ["Content-Type", "Authorization"]
     }
 })  # Enable CORS for all routes with specific configuration
+print(os.getenv('CLIENT_URL'))
 
 # Enable hot reloading
 app.config['DEBUG'] = True
