@@ -1548,25 +1548,29 @@ def main():
         print("\nPlease set all required environment variables and try again.")
         return
     
-    # Configuration
-    host = os.getenv('HOST', 'localhost')
-    port = int(os.getenv('PORT', 5050))
-    debug = True  # Force debug mode for hot reloading
+     # Configuration
+    host = os.getenv('HOST', '0.0.0.0')
+    port = int(os.getenv('PORT', 10000))
+    debug = os.getenv('DEBUG', 'False').lower() == 'true'
     
     print(f"\nServer Configuration:")
     print(f"- Host: {host}")
     print(f"- Port: {port}")
     print(f"- Debug Mode: {debug}")
-    print(f"- Hot Reloading: Enabled")
     
-    # Run the application with hot reloading
-    app.run(
-        host=host,
-        port=port,
-        debug=True,
-        use_reloader=True,
-        threaded=True
-    )
+    if debug:
+        # Run with Flask's built-in server for development
+        app.run(
+            host=host,
+            port=port,
+            debug=debug,
+            use_reloader=debug,
+            threaded=True
+        )
+    else:
+        # Run with Waitress for production
+        print("\nRunning in production mode with Waitress...")
+        serve(app, host=host, port=port)
 
 if __name__ == '__main__':
     main()
