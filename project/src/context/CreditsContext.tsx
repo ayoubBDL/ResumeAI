@@ -36,7 +36,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     if (!user?.id) return;
     
     try {
-      const creditsResponse = await axios.get('/api/credits', {
+      const creditsResponse = await axios.get(`${import.meta.env.VITE_RESUME_API_URL}/api/credits`, {
         headers: { 'X-User-Id': user.id }
       });
       
@@ -58,7 +58,7 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     if (!user?.id) return;
     
     try {
-      const creditsResponse = await axios.get('/api/credits', {
+      const creditsResponse = await axios.get(`${import.meta.env.VITE_RESUME_API_URL}/api/credits`, {
         headers: { 'X-User-Id': user.id }
       });
       

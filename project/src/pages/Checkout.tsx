@@ -63,7 +63,7 @@ export default function Checkout() {
       // Send subscription/credit purchase request to backend
       if (plan.plan_type === 'payg') {
         // Credit purchase
-        const response = await axios.post('/api/credits/purchase', {
+        const response = await axios.post(`${import.meta.env.VITE_RESUME_API_URL}/api/credits/purchase`, {
           orderId: data.orderID,
           credits: credits,
           amount: credits * 1,
@@ -77,7 +77,7 @@ export default function Checkout() {
         showToast(`Successfully purchased ${credits} credits!`, 'success');
       } else {
         // Subscription purchase
-        await axios.post('/api/subscriptions', 
+        await axios.post(`${import.meta.env.VITE_RESUME_API_URL}/api/subscriptions`, 
           { 
             plan_type: plan.plan_type,
             orderId: data.orderID,

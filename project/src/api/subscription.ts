@@ -3,7 +3,7 @@ import axios from 'axios';
 export const subscriptionApi = {
   getSubscription: async (userId: string) => {
     try {
-      const response = await axios.get('/api/subscriptions', {
+      const response = await axios.get(`${import.meta.env.VITE_RESUME_API_URL}/api/subscriptions`, {
         headers: { 'X-User-Id': userId }
       });
       return response.data;
@@ -15,7 +15,7 @@ export const subscriptionApi = {
 
   getCredits: async (userId: string) => {
     try {
-      const response = await axios.get('/api/credits', {
+      const response = await axios.get(`${import.meta.env.VITE_RESUME_API_URL}/api/credits`, {
         headers: { 'X-User-Id': userId }
       });
       return response.data.credits;
@@ -27,7 +27,7 @@ export const subscriptionApi = {
 
   cancelSubscription: async (userId: string) => {
     try {
-      const response = await axios.post('/api/cancel-subscription', {}, {
+      const response = await axios.post(`${import.meta.env.VITE_RESUME_API_URL}/api/cancel-subscription`, {}, {
         headers: { 'X-User-Id': userId }
       });
       return response.data;

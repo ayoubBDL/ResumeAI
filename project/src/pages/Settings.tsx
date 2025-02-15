@@ -176,7 +176,7 @@ export default function Settings() {
     try {
       if (!user) return;
 
-      const response = await axios.put('/api/users/profile', {
+      const response = await axios.put(`${import.meta.env.VITE_RESUME_API_URL}/api/users/profile`, {
         full_name: name
       }, {
         headers: { 'X-User-Id': user.id }
