@@ -7,7 +7,6 @@ import io
 import base64
 import pdfplumber
 from flask import Flask, request, jsonify, make_response, send_file
-from flask_cors import CORS
 from services.linkedin_batch_scraper import LinkedInJobScraper
 from services.linkedin_scraper import LinkedInJobScraper as JobScraper
 from services.supabase_client import supabase
@@ -46,16 +45,14 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {  # Allow all routes
-        "origins": [os.getenv('CLIENT_URL')],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type", "Authorization"]
-    }
-})  # Enable CORS for all routes with specific configuration
-print(os.getenv('CLIENT_URL'))
+CORS(
+    app,
+    origins=[os.getenv('CLIENT_URL')],  # Allow only the specified origin
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Allow these HTTP methods
+    allow_headers=["Content-Type", "Authorization", "X-User-Id"],  # Allow these headers
+    supports_credentials=True,  # Allow credentials (e.g., cookies)
+    expose_headers=["Content-Type", "Authorization"]  # Expose these headers to the client
+)
 
 # Enable hot reloading
 app.config['DEBUG'] = True
@@ -1559,6 +1556,8 @@ def main():
     print(f"- Host: {host}")
     print(f"- Port: {port}")
     print(f"- Debug Mode: {debug}")
+    print(f"- Client URL: {os.getenv('CLIENT_URL')}")
+
     
     if debug:
         # Run with Flask's built-in server for development
