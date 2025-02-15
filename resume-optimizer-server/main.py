@@ -47,7 +47,7 @@ supabase: Client = create_client(supabase_url, supabase_key)
 app = Flask(__name__)
 CORS(
     app,
-    origins=[os.getenv('CLIENT_URL')],  # Allow only the specified origin
+    origins=[os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app')],  # Allow only the specified origin
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Allow these HTTP methods
     allow_headers=["Content-Type", "Authorization", "X-User-Id"],  # Allow these headers
     supports_credentials=True,  # Allow credentials (e.g., cookies)
