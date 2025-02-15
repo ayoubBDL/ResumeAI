@@ -45,16 +45,26 @@ if not supabase_url or not supabase_key:
 supabase: Client = create_client(supabase_url, supabase_key)
 
 app = Flask(__name__)
+
+# Define allowed origins
+ALLOWED_ORIGINS = [
+    os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app'),  # Production URL
+    'http://localhost:5173',  # Development URL
+]
+
+# Centralized CORS configuration
 CORS(
     app,
-    origins=[
-        os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app'),  # Production URL
-        'http://localhost:5173',  # Development URL
-    ],
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-User-Id"],
-    supports_credentials=True,
-    expose_headers=["Content-Type", "Authorization"]
+    resources={
+        r"/api/*": {  # Apply to all /api/ routes
+            "origins": ALLOWED_ORIGINS,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-User-Id"],
+            "supports_credentials": True,
+            "expose_headers": ["Content-Type", "Authorization"],
+            "max_age": 600  # Cache preflight requests for 10 minutes
+        }
+    }
 )
 
 # Enable hot reloading
@@ -438,17 +448,9 @@ def optimize_resume():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/resumes/<resume_id>/cover-letter/download', methods=['GET', 'OPTIONS'])
+@app.route('/api/resumes/<resume_id>/cover-letter/download', methods=['GET'])
 def download_cover_letter(resume_id):
     """Generate and download cover letter PDF from stored content"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -489,25 +491,9 @@ def download_cover_letter(resume_id):
             "error": str(e)
         }), 500
 
-@app.route('/api/resumes', methods=['GET', 'OPTIONS'])
+@app.route('/api/resumes', methods=['GET'])
 def get_resumes():
     """Endpoint to get all resumes"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        # Get the origin from the request
-        origin = request.headers.get('Origin', '')
-        # Check if the origin is allowed
-        allowed_origins = [
-            os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app'),
-            'http://localhost:5173'
-        ]
-        if origin in allowed_origins:
-            response.headers.add('Access-Control-Allow-Origin', origin)
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-            response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -541,17 +527,9 @@ def get_resumes():
             "error": str(e)
         }), 500
 
-@app.route('/api/resumes/<resume_id>/download', methods=['GET', 'OPTIONS'])
+@app.route('/api/resumes/<resume_id>/download', methods=['GET'])
 def download_resume(resume_id):
     """Endpoint to get a signed URL for downloading a resume PDF"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -601,17 +579,9 @@ def download_resume(resume_id):
             "error": str(e)
         }), 500
 
-@app.route('/api/resumes/<resume_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/resumes/<resume_id>', methods=['DELETE'])
 def delete_resume(resume_id):
     """Endpoint to delete a resume"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'DELETE,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -661,17 +631,9 @@ def upload_file():
     # Remove the delete endpoint since we're handling it in the frontend
     pass
 
-@app.route('/job/<job_id>', methods=['GET', 'OPTIONS'])
+@app.route('/job/<job_id>', methods=['GET'])
 def get_job(job_id):
     """Endpoint to get job details by ID"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -711,17 +673,9 @@ def get_job(job_id):
             "error": str(e)
         }), 500
 
-@app.route('/api/jobs', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/api/jobs', methods=['GET', 'POST'])
 def jobs():
     """Handle jobs endpoints"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -815,17 +769,9 @@ def jobs():
             "error": str(e)
         }), 500
 
-@app.route('/api/jobs/<job_id>/download', methods=['GET', 'OPTIONS'])
+@app.route('/api/jobs/<job_id>/download', methods=['GET'])
 def download_job_resume(job_id):
     """Endpoint to get a signed URL for downloading a resume PDF"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -886,17 +832,9 @@ def download_job_resume(job_id):
             "error": str(e)
         }), 500
 
-@app.route('/api/jobs/<job_id>/status', methods=['PUT', 'OPTIONS'])
+@app.route('/api/jobs/<job_id>/status', methods=['PUT'])
 def update_job_status(job_id):
     """Update job application status"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'PUT,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -1267,17 +1205,9 @@ def create_subscription():
         print(f"Error creating subscription: {str(e)}")
         return jsonify({"error": "Failed to create subscription"}), 500
 
-@app.route('/api/cancel-subscription', methods=['POST', 'OPTIONS'])
+@app.route('/api/cancel-subscription', methods=['POST'])
 def cancel_subscription():
     """Cancel user subscription"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -1485,17 +1415,9 @@ def create_paypal_subscription():
         print(f"Error creating subscription: {str(e)}")
         return jsonify({"error": "Failed to create subscription"}), 500
 
-@app.route('/api/users/profile', methods=['PUT', 'OPTIONS'])
+@app.route('/api/users/profile', methods=['PUT'])
 def update_user_profile():
     """Update user profile"""
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'PUT,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response
-
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
