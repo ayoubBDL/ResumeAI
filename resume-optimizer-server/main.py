@@ -47,11 +47,14 @@ supabase: Client = create_client(supabase_url, supabase_key)
 app = Flask(__name__)
 CORS(
     app,
-    origins=[os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app')],  # Allow only the specified origin
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Allow these HTTP methods
-    allow_headers=["Content-Type", "Authorization", "X-User-Id"],  # Allow these headers
-    supports_credentials=True,  # Allow credentials (e.g., cookies)
-    expose_headers=["Content-Type", "Authorization"]  # Expose these headers to the client
+    origins=[
+        os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app'),  # Production URL
+        'http://localhost:5173',  # Development URL
+    ],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-User-Id"],
+    supports_credentials=True,
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 # Enable hot reloading
@@ -491,10 +494,18 @@ def get_resumes():
     """Endpoint to get all resumes"""
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        # Get the origin from the request
+        origin = request.headers.get('Origin', '')
+        # Check if the origin is allowed
+        allowed_origins = [
+            os.getenv('CLIENT_URL', 'https://jobsageai.netlify.app'),
+            'http://localhost:5173'
+        ]
+        if origin in allowed_origins:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-User-Id')
+            response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
         return response
 
     try:
