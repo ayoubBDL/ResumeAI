@@ -185,9 +185,8 @@ export default function Billing() {
                     : 'Free Plan'}
                 </h3>
                 <p className="text-gray-600">
-                  {subscription?.subscription?.plan_type === 'yearly' 
-                    ? 'Unlimited credits':`${credits} credits remaining` 
-                      
+                  {credits === null ? 'Loading...' : subscription?.subscription?.plan_type === 'yearly' 
+                    ? 'Unlimited credits' : `${credits} credits remaining` 
                   }
                 </p>
                 <p className="text-sm text-gray-500 mt-2">
