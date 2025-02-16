@@ -120,7 +120,6 @@ export default function Settings() {
     if (cachedCredits) {
       try {
         const parsed = JSON.parse(cachedCredits);
-        console.log("parsed", parsed);
       } catch (error) {
         console.error('Error parsing localStorage credits:', error);
       }

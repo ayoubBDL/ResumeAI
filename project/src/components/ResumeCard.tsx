@@ -76,18 +76,15 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       .replace(/\*\*/g, '')  // Remove ** markers
       .trim();
       
-    console.log('[DEBUG] Opening analysis modal with data:', cleanedAnalysis);
     setIsAnalysisOpen(true);
   };
 
   const handleDelete = async () => {
     try {
-      console.log('Starting delete process for resume:', resume.id);
       setIsDeleting(true);
       setError(null);
       
       await deleteResume(resume.id);
-      console.log('Resume deleted successfully, calling onUpdate');
       
       // Close the modal and refresh the list
       setShowDeleteConfirm(false);
@@ -96,7 +93,6 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       console.error('Error in handleDelete:', error);
       setError(error instanceof Error ? error.message : 'Failed to delete resume');
     } finally {
-      console.log('Delete process finished');
       setIsDeleting(false);
     }
   };

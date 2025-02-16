@@ -188,7 +188,11 @@ function SavedJobs() {
             {error}
           </div>
         )}
-
+        {isLoading ? 
+       ( <div className="flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>)
+        :<>
         {filteredJobs.length > 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-md">
             <ul className="divide-y divide-gray-200">
@@ -330,6 +334,7 @@ function SavedJobs() {
             </p>
           </div>
         )}
+        </>}
 
         <AnalysisModal
           isOpen={isAnalysisOpen}

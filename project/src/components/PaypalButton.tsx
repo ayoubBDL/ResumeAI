@@ -23,7 +23,6 @@ export default function PaypalButton({
             console.error("No plan_id provided for subscription");
             return;
         }
-        console.log("Creating subscription with plan_id:", plan_id);
         return actions.subscription.create({
             plan_id: plan_id,
             application_context: {
@@ -73,7 +72,6 @@ export default function PaypalButton({
     };
 
     const handleCancel = (data: any) => {
-        console.log("Payment cancelled", data);
         onCancel(data);
     }
 

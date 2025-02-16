@@ -24,7 +24,6 @@ export default function Checkout() {
     if (location.state) {
       setPlan(location.state.plan);
       setCurrentSubscription(location.state.currentSubscription);
-      console.log("location.state", location.state, location.state.currentSubscription);
       // If Pay As You Go, set minimum credits
       if (location.state.plan.plan_type === 'payg') {
         setCredits(Math.max(5, credits));
@@ -70,7 +69,6 @@ export default function Checkout() {
         }, {
           headers: { 'X-User-Id': user?.id }
         });
-        console.log("response", response);
         // Update credits in context and localStorage
         await updateCredits();
         

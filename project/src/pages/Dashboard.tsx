@@ -14,6 +14,7 @@ function Dashboard() {
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const [creditError, setCreditError] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
@@ -53,11 +54,14 @@ function Dashboard() {
 
   const loadRecentResumes = async () => {
     try {
+      setLoading(true);
       const resumes = await getRecentResumes(3); // Only fetch 3 most recent resumes
       setRecentResumes(resumes);
     } catch (error) {
       console.error('Error loading resumes:', error);
       setUploadStatus('Failed to load recent resumes');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -292,7 +296,12 @@ function Dashboard() {
 
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold mb-4">Recent Resumes</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {loading? 
+        <div className="flex justify-center items-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+         : 
+         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {recentResumes.length > 0 ? (
             recentResumes.map((resume) => (
               <ResumeCard key={resume.id} resume={resume} onUpdate={loadRecentResumes} />
@@ -308,7 +317,7 @@ function Dashboard() {
               <p className="mt-1 text-sm text-gray-500">Get started by optimizing your first resume!</p>
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );
