@@ -1,33 +1,13 @@
 from flask import Blueprint, request, jsonify
 from supabase import create_client, Client
 import os
-from dotenv import load_dotenv
 import os
-import openai
-import requests
-import json
-import io
-import base64
-import pdfplumber
-from flask import Flask, request, jsonify, make_response, send_file
+from flask import request, jsonify, make_response
 from services.supabase_client import supabase
-from reportlab.lib import colors
-
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, Table, TableStyle, HRFlowable
-import re
-import tempfile
-import time
-from bs4 import BeautifulSoup
+from services.pdf_generator import PDFGenerator
 from supabase import create_client, Client
-import datetime
-import logging
-from flask import Flask, request, jsonify, make_response, send_file
-from flask_cors import CORS
-from requests.auth import HTTPBasicAuth
-from waitress import serve 
+from flask import request, jsonify, make_response
+
 # Create a Blueprint for user routes
 resume_routes = Blueprint('resume_routes', __name__)
 

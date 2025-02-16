@@ -1,39 +1,22 @@
 from flask import Blueprint, request, jsonify
 from services.openai_optimizer import OpenAIOptimizer
 from services.pdf_generator import PDFGenerator
-from services.linkedin_scraper import LinkedInJobScraper
 from supabase import create_client, Client
 import os
 import base64
 import re
 import time
-from dotenv import load_dotenv
-import os
-import openai
-import requests
-import json
-import io
-import base64
-import pdfplumber
-from flask import Flask, request, jsonify, make_response, send_file
+from flask import request, jsonify
 from services.supabase_client import supabase
-from reportlab.lib import colors
 
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, Table, TableStyle, HRFlowable
-import re
 import tempfile
 import time
-from bs4 import BeautifulSoup
 from supabase import create_client, Client
 import datetime
-import logging
-from flask import Flask, request, jsonify, make_response, send_file
-from flask_cors import CORS
-from requests.auth import HTTPBasicAuth
-from waitress import serve 
+from flask import request, jsonify
+from routes.subscription_routes import check_user_credits
+from services.linkedin_scraper import LinkedInJobScraper as JobScraper
+
 
 # Create a Blueprint for optimization routes
 optimize_routes = Blueprint('optimize_routes', __name__)
