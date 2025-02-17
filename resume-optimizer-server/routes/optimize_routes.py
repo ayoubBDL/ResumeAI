@@ -16,7 +16,7 @@ import datetime
 from flask import request, jsonify
 from routes.subscription_routes import check_user_credits
 from services.linkedin_scraper import LinkedInJobScraper as JobScraper
-
+from loguru import logger
 
 # Create a Blueprint for optimization routes
 optimize_routes = Blueprint('optimize_routes', __name__)
@@ -176,6 +176,7 @@ def optimize_resume():
 
         except Exception as e:
             print(f"Error in optimization process: {str(e)}")
+            logger.error(f"Error in optimization process: {str(e)}")
             return jsonify({'error': f'Optimization failed: {str(e)}'}), 500
 
     except Exception as e:

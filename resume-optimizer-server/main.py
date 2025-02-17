@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from waitress import serve
 from supabase import create_client, Client
+from loguru import logger
 
 # Import route blueprints
 from routes.job_routes import job_routes
@@ -93,85 +94,44 @@ def after_request(response):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-User-Id'
     return response
 
-# Ollama integration
-def generate_with_ollama(prompt):
-    """Generate optimization suggestions using Ollama"""
-    try:
-        print("[Ollama] Sending request to Ollama API...")
-        response = requests.post(
-            'http://localhost:11434/api/generate',
-            json={
-                "model": "mistral",
-                "prompt": prompt,
-                "stream": False
-            }
-        )
-        response.raise_for_status()
-        print("[Ollama] Successfully received response")
-        return response.json()['response']
-    except Exception as e:
-        print(f"[Ollama ERROR] Error generating suggestions: {str(e)}")
-        raise
+# Global error handler
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Log the error with additional context
+    logger.error(
+        f"An error occurred: {str(e)}",
+        exc_info=True,  # Include the full traceback
+        extra={
+            "request_method": request.method,
+            "request_path": request.path,
+            "request_headers": dict(request.headers),
+            "request_body": request.get_json(silent=True) or request.form or request.data,
+        },
+    )
+    
+    # Return a JSON response with the error message
+    return jsonify({"success": False, "error": str(e)}), 500
 
-# Basic routes
-@app.route('/')
-def home():
-    """Root endpoint providing API information"""
-    return jsonify({
-        "message": "Resume Optimizer API is running",
-        "status": "healthy",
-        "version": "1.0.0",
-        "endpoints": {
-            "GET /": "API information",
-            "GET /health": "Health check",
-            "POST /get-job-details": "Get job details from LinkedIn",
-            "POST /optimize": "Optimize resume for job posting",
-            "POST /scrape-jobs": "Scrape jobs from LinkedIn",
-            "POST /scrape-job-url": "Scrape job by URL",
-            "POST /search-similar-jobs": "Search for similar jobs",
-            "GET /job/<job_id>": "Get job details by ID",
-            "GET /api/jobs": "Get user's jobs",
-            "POST /api/jobs": "Create new job application",
-            "PUT /api/jobs/<job_id>/status": "Update job application status"
-        }
-    })
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "timestamp": time.time()
-    })
-
-# Environment validation
 def validate_environment():
     """Validate required environment variables"""
     required_vars = [
-        'OPENAI_API_KEY',
-        'SUPABASE_URL',
-        'SUPABASE_KEY',
-        'PAYPAL_API_URL',
-        'CLIENT_URL'
+        'OPENAI_API_KEY',  # OpenAI API key
+        'SUPABASE_URL',     # Supabase project URL
+        'SUPABASE_KEY',     # Supabase API key
+        'PAYPAL_API_URL',   # PayPal API URL
+        'CLIENT_URL',       # Frontend client URL
     ]
     
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
-        print("Error: Missing required environment variables:")
+        logger.error("Missing required environment variables:")
         for var in missing_vars:
-            print(f"- {var}")
+            logger.error(f"- {var}")
         return False
+    
+    logger.info("All required environment variables are set.")
     return True
-
-# Error handlers
-@app.errorhandler(404)
-def not_found_error(error):
-    return jsonify({"error": "Resource not found"}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({"error": "Internal server error"}), 500
 
 # Main application entry point
 def main():
@@ -209,6 +169,7 @@ def main():
     else:
         # Production mode with Waitress
         print("\nRunning in production mode with Waitress...")
+        logger.info("Resume Optimizer API is running")
         serve(app, host=host, port=port)
 
 if __name__ == '__main__':
