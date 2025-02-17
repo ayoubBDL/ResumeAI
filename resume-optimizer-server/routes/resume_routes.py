@@ -134,8 +134,9 @@ def download_resume(resume_id):
         # Create response with PDF file
         response = make_response(pdf_data)
         filename = f"resume_{title}.pdf"  # Added .pdf extension
-        sentry_sdk.capture_message(f"Resume Content (first 50 chars): {resume_content[:50]}")
-        sentry_sdk.capture_message(f"Downloading pdf_data {pdf_data}")
+        sentry_sdk.capture_message(f"Resume Content (first 50 chars): {resume_content[:50]}", level="info")
+        sentry_sdk.capture_message(f"Downloading pdf_data {pdf_data}", level="info")
+        sentry_sdk.capture_exception(Exception("Test exception"))
         
         # Set the correct headers
         response.headers['Content-Type'] = 'application/pdf'

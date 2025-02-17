@@ -150,7 +150,8 @@ def validate_environment():
         'SUPABASE_URL',     # Supabase project URL
         'SUPABASE_KEY',     # Supabase API key
         'PAYPAL_API_URL',   # PayPal API URL
-        'CLIENT_URL',       # Frontend client URL
+        'CLIENT_URL',   
+        'SENTRY_DSN'
     ]
     
     missing_vars = [var for var in required_vars if not os.getenv(var)]
