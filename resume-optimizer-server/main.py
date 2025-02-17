@@ -97,6 +97,9 @@ def after_request(response):
 # Global error handler
 @app.errorhandler(Exception)
 def handle_exception(e):
+    # Extract user ID from request headers
+    user_id = request.headers.get('X-User-Id', 'Unknown User')  # Default to 'Unknown User' if not present
+
     # Log the error with additional context
     logger.error(
         f"An error occurred: {str(e)}",
@@ -106,11 +109,12 @@ def handle_exception(e):
             "request_path": request.path,
             "request_headers": dict(request.headers),
             "request_body": request.get_json(silent=True) or request.form or request.data,
+            "user_id": user_id  # Log the user ID
         },
     )
     
     # Return a JSON response with the error message
-    return jsonify({"success": False, "error": str(e)}), 500
+    return jsonify({"success": False, "error": str(e), "user_id": user_id}), 500
 
 def validate_environment():
     """Validate required environment variables"""
