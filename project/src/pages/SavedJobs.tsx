@@ -65,37 +65,31 @@ function SavedJobs() {
       setIsDownloading(true);
       setError(null);
       
-      // Get the signed URL from the backend
+      // Get the PDF directly from the backend
       const response = await fetch(`/api/resumes/${resumeId}/download`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'X-User-Id': userId
         }
       });
-
+  
       if (!response.ok) {
-        throw new Error('Failed to get download URL');
+        // Try to parse error message if it's JSON
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to download PDF');
+        } catch (e) {
+          throw new Error('Failed to download PDF');
+        }
       }
-
-      const data = await response.json();
-      if (!data.success || !data.url) {
-        throw new Error(data.error || 'Failed to get download URL');
-      }
-
-      // Fetch the actual PDF content
-      const pdfResponse = await fetch(data.url);
-      if (!pdfResponse.ok) {
-        throw new Error('Failed to download PDF');
-      }
-
-      const pdfBlob = await pdfResponse.blob();
+      // Convert response to blob
+      const pdfBlob = await response.blob();
       const blobUrl = window.URL.createObjectURL(pdfBlob);
-
+  
       // Create a temporary link element to trigger download
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', `${jobTitle || 'resume'}.pdf`);
+      link.setAttribute('download', `resume_${jobTitle || 'document'}.pdf`);
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();

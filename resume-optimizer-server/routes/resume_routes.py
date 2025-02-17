@@ -97,7 +97,6 @@ def get_resumes():
 
 @resume_routes.route('/api/resumes/<resume_id>/download', methods=['GET'])
 def download_resume(resume_id):
-    """Endpoint to get a signed URL for downloading a resume PDF"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -106,46 +105,46 @@ def download_resume(resume_id):
                 "error": "Missing X-User-Id header"
             }), 401
 
-        # First verify the resume belongs to the user and get the PDF URL
-        response = supabase.table('resumes')\
-            .select('optimized_pdf_url')\
+        # Get the resume content from the database
+        supabase_response = supabase.table('resumes')\
+            .select('content, title')\
             .eq('id', resume_id)\
             .eq('user_id', user_id)\
             .execute()
 
-        if not response.data:
+        if not supabase_response.data or len(supabase_response.data) == 0:
             return jsonify({"error": "Resume not found or not authorized"}), 404
 
-        optimized_pdf_url = response.data[0].get('optimized_pdf_url')
-        if not optimized_pdf_url:
-            return jsonify({"error": "Resume file not found"}), 404
+        # Get the title and content
+        title = supabase_response.data[0].get('title', 'document')
+        resume_content = supabase_response.data[0].get('content')
+        
+        if not resume_content:
+            return jsonify({"error": "Resume content not found"}), 404
 
-        # Extract the file path from the stored URL
-        # URL format: https://<project>.supabase.co/storage/v1/object/sign/resumes/<filename>?token=...
-        try:
-            file_path = optimized_pdf_url.split('/resumes/')[1].split('?')[0]
-        except:
-            return jsonify({"error": "Invalid file URL format"}), 500
+        # Generate PDF from resume content
+        pdf_generator = PDFGenerator()
+        pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        # Generate a fresh signed URL
-        signed_url_response = supabase.storage \
-            .from_('resumes') \
-            .create_signed_url(file_path, 300)  # URL valid for 5 minutes
-
-        if not signed_url_response or 'signedURL' not in signed_url_response:
-            return jsonify({"error": "Failed to generate download URL"}), 500
-
-        return jsonify({
-            "success": True,
-            "url": signed_url_response['signedURL']
-        })
+        # Create response with PDF file
+        response = make_response(pdf_data)
+        filename = f"resume_{title}.pdf"  # Added .pdf extension
+        
+        # Set the correct headers
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Important: Don't wrap the response in jsonify
+        return response
 
     except Exception as e:
+        # For errors, we still want to return JSON
         print(f"Error: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
+
 
 @resume_routes.route('/api/resumes/<resume_id>', methods=['DELETE'])
 def delete_resume(resume_id):

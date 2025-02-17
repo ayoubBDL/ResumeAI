@@ -22,36 +22,42 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       setIsDownloading(true);
       setError(null);
       
-      // Get the signed URL from the backend
+      // Get the PDF directly from the backend
       const response = await fetch(`/api/resumes/${resume.id}/download`, {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
           'X-User-Id': resume.user_id
         }
       });
-
+  
       if (!response.ok) {
-        throw new Error('Failed to get download URL');
+        // Try to parse error message if it's JSON
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to download PDF');
+        } catch (e) {
+          throw new Error('Failed to download PDF');
+        }
       }
-
-      const data = await response.json();
-      if (!data.success || !data.url) {
-        throw new Error(data.error || 'Failed to get download URL');
+  
+      // Get the filename from the Content-Disposition header if available
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${resume.title || 'resume'}.pdf`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
       }
-
-      const pdfResponse = await fetch(data.url);
-      if (!pdfResponse.ok) {
-        throw new Error('Failed to download PDF');
-      }
-
-      const pdfBlob = await pdfResponse.blob();
+  
+      // Convert response to blob
+      const pdfBlob = await response.blob();
       const blobUrl = window.URL.createObjectURL(pdfBlob);
-
+  
       // Create a temporary link element to trigger download
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', `${resume.title || 'resume'}.pdf`);
+      link.setAttribute('download', filename);
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
@@ -127,7 +133,7 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
           </p>
         </div>
         <div className="flex space-x-2">
-          {resume.optimized_pdf_url && (
+          {resume && (
             <button
               onClick={handleDownload}
               disabled={isDownloading || isDeleting}

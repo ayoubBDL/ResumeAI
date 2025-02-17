@@ -99,128 +99,80 @@ def optimize_resume():
             safe_filename = re.sub(r'[^a-zA-Z0-9.-]', '_', resume_file.filename)
             filename = f"{int(time.time())}_{safe_filename}"
             
-            # Create temporary file to store PDF
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', mode='wb') as temp_pdf:
-                temp_pdf.write(pdf_data)
-                temp_pdf.flush()
+            # Store the resume content in the resumes table
+            resume_data = {
+                'user_id': user_id,
+                'title': safe_filename,
+                'job_url': job_url,
+                'content': resume_content,  # Store resume content here
+                'analysis': analysis,  # Store only the analysis part
+                'cover_letter': cover_letter,  # Store cover letter content
+                'status': 'completed'
+            }
+
+            resume_result = supabase \
+                .table('resumes') \
+                .insert(resume_data) \
+                .execute()
+
+            if not resume_result.data:
+                raise Exception("Failed to create resume record")
+
+            resume_id = resume_result.data[0]['id']
+
+            # Create job application if we have job details
+            if job_description:
+                print(f"Creating job application with details:", {
+                    'job_title': job_title or 'Untitled Position',
+                    'company': company or 'Unknown Company',
+                    'has_description': bool(job_description)
+                })
                 
-                # Upload PDF to Supabase Storage
                 try:
-                    with open(temp_pdf.name, 'rb') as pdf_file:
-                        upload_result = supabase.storage \
-                            .from_('resumes') \
-                            .upload(
-                                path=filename,
-                                file=pdf_file,
-                                file_options={"content-type": "application/pdf"}
-                            )
-                    
-                    if not upload_result:
-                        raise Exception("Failed to upload PDF to storage")
-
-                except Exception as upload_error:
-                    print(f"Upload error: {str(upload_error)}")
-                    raise upload_error
-                finally:
-                    # Clean up temporary file
-                    try:
-                        os.unlink(temp_pdf.name)
-                    except:
-                        pass
-
-            # Get signed URL for the uploaded PDF
-            try:
-                url_result = supabase.storage \
-                    .from_('resumes') \
-                    .create_signed_url(filename, 60 * 60)  # 1 hour expiry
-
-                if not url_result or 'signedURL' not in url_result:
-                    raise Exception("Failed to get signed URL")
-
-                signed_url = url_result['signedURL']
-            except Exception as url_error:
-                print(f"Signed URL error: {str(url_error)}")
-                raise url_error
-
-            # Create resume record in database
-            try:
-                resume_data = {
-                    'user_id': user_id,
-                    'title': safe_filename,
-                    'job_url': job_url,
-                    'optimized_pdf_url': signed_url,
-                    'analysis': analysis,  # Store only the analysis part
-                    'cover_letter': cover_letter,
-                    'status': 'completed'
-                }
-                
-                resume_result = supabase \
-                    .table('resumes') \
-                    .insert(resume_data) \
-                    .execute()
-
-                if not resume_result.data:
-                    raise Exception("Failed to create resume record")
-
-                resume_id = resume_result.data[0]['id']
-
-                # Create job application if we have job details
-                if job_description:
-                    print(f"Creating job application with details:", {
+                    job_data = {
+                        'user_id': user_id,
+                        'resume_id': resume_id,
                         'job_title': job_title or 'Untitled Position',
                         'company': company or 'Unknown Company',
-                        'has_description': bool(job_description)
-                    })
+                        'job_description': job_description,
+                        'job_url': job_url,
+                        'status': 'pending'
+                    }
                     
-                    try:
-                        job_data = {
-                            'user_id': user_id,
-                            'resume_id': resume_id,
-                            'job_title': job_title or 'Untitled Position',
-                            'company': company or 'Unknown Company',
-                            'job_description': job_description,
-                            'job_url': job_url,
-                            'status': 'pending'
-                        }
+                    job_result = supabase \
+                        .table('job_applications') \
+                        .insert(job_data) \
+                        .execute()
                         
-                        job_result = supabase \
-                            .table('job_applications') \
-                            .insert(job_data) \
-                            .execute()
-                            
-                        print(f"Job application created:", job_result.data if job_result else None)
-                    except Exception as job_error:
-                        print(f"Error creating job application: {str(job_error)}")
-                        # Don't raise the error as this is not critical
-                else:
-                    print(f"Skipping job application - missing required fields:", {
-                        'has_url': bool(job_url),
-                        'has_title': bool(job_title),
-                        'has_company': bool(company)
-                    })
-
-                # Since optimization was successful, deduct one credit if not enterprise user
-                if credits_remaining is not None:  # Only deduct if user is using credits (not enterprise)
-                    supabase.table('usage_credits').update({
-                        'credits_remaining': credits_remaining - 1,
-                        'updated_at': datetime.datetime.utcnow().isoformat()
-                    }).eq('user_id', user_id).execute()
-                
-                # Return success response with base64 PDF data and resume details
-                return jsonify({
-                    'success': True,
-                    'pdf_data': pdf_base64,
-                    'analysis': analysis,  # Return only the analysis part
-                    'resume_id': resume_id,
-                    'title': safe_filename,
-                    'created_at': datetime.datetime.now().isoformat(),
-                    'job_url': job_url,
-                    'status': 'completed'
+                    print(f"Job application created:", job_result.data if job_result else None)
+                except Exception as job_error:
+                    print(f"Error creating job application: {str(job_error)}")
+                    # Don't raise the error as this is not critical
+            else:
+                print(f"Skipping job application - missing required fields:", {
+                    'has_url': bool(job_url),
+                    'has_title': bool(job_title),
+                    'has_company': bool(company)
                 })
 
-            except Exception as db_error:
-                print(f"Database error: {str(db_error)}")
-                raise db_error
+            # Since optimization was successful, deduct one credit if not enterprise user
+            if credits_remaining is not None:  # Only deduct if user is using credits (not enterprise)
+                supabase.table('usage_credits').update({
+                    'credits_remaining': credits_remaining - 1,
+                    'updated_at': datetime.datetime.utcnow().isoformat()
+                }).eq('user_id', user_id).execute()
+            
+            # Return success response with base64 PDF data and resume details
+            return jsonify({
+                'success': True,
+                'pdf_data': pdf_base64,
+                'analysis': analysis,  # Return only the analysis part
+                'resume_id': resume_id,
+                'title': safe_filename,
+                'created_at': datetime.datetime.now().isoformat(),
+                'job_url': job_url,
+                'status': 'completed'
+            })
 
         except Exception as e:
             print(f"Error in optimization process: {str(e)}")
