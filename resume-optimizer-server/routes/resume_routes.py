@@ -127,7 +127,9 @@ def download_resume(resume_id):
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        logger.info(f"resume Content: {resume_content}")
+        # Log the first 50 characters of the resume content
+        logger.info(f"Resume Content (first 50 chars): {resume_content[:50]}...")  # Log first 50 characters
+
         # Create response with PDF file
         response = make_response(pdf_data)
         filename = f"resume_{title}.pdf"  # Added .pdf extension
