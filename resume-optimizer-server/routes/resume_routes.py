@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+import sentry_sdk
 from supabase import create_client, Client
 import os
 import os
@@ -133,6 +134,8 @@ def download_resume(resume_id):
         # Create response with PDF file
         response = make_response(pdf_data)
         filename = f"resume_{title}.pdf"  # Added .pdf extension
+        sentry_sdk.capture_message(f"Resume Content (first 50 chars): {resume_content[:50]}")
+        sentry_sdk.capture_message(f"Downloading pdf_data {pdf_data}")
         
         # Set the correct headers
         response.headers['Content-Type'] = 'application/pdf'
@@ -144,6 +147,7 @@ def download_resume(resume_id):
 
     except Exception as e:
         # For errors, we still want to return JSON
+        sentry_sdk.capture_exception(e)
         logger.error(
         f"An error occurred: {str(e)} and user_id: {user_id}",
         exc_info=True,  # Include the full traceback
