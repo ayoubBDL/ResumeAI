@@ -100,13 +100,19 @@ def handle_exception(e):
     # Extract user ID from request headers
     user_id = request.headers.get('X-User-Id', 'Unknown User')  # Default to 'Unknown User' if not present
 
+    # Construct the full request URL
+    full_url = request.url
+    query_params = request.query_string.decode()  # Get query parameters as a string
+
     # Log the error with additional context
     logger.error(
-        f"An error occurred: {str(e)}",
+        f"An error occurred: {str(e)} and user_id: {user_id} and full_url: {full_url} and query_params: {query_params}",
         exc_info=True,  # Include the full traceback
         extra={
             "request_method": request.method,
             "request_path": request.path,
+            "full_url": full_url,  # Log the full URL
+            "query_params": query_params,  # Log the query parameters
             "request_headers": dict(request.headers),
             "request_body": request.get_json(silent=True) or request.form or request.data,
             "user_id": user_id  # Log the user ID

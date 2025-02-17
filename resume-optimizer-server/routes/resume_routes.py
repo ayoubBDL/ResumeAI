@@ -7,6 +7,7 @@ from services.supabase_client import supabase
 from services.pdf_generator import PDFGenerator
 from supabase import create_client, Client
 from flask import request, jsonify, make_response
+from loguru import logger
 
 # Create a Blueprint for user routes
 resume_routes = Blueprint('resume_routes', __name__)
@@ -126,6 +127,7 @@ def download_resume(resume_id):
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
+        logger.info(f"resume Content: {resume_content}")
         # Create response with PDF file
         response = make_response(pdf_data)
         filename = f"resume_{title}.pdf"  # Added .pdf extension
@@ -133,12 +135,17 @@ def download_resume(resume_id):
         # Set the correct headers
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        logger.info(f"Downloading resume: {response}")
         
         # Important: Don't wrap the response in jsonify
         return response
 
     except Exception as e:
         # For errors, we still want to return JSON
+        logger.error(
+        f"An error occurred: {str(e)} and user_id: {user_id}",
+        exc_info=True,  # Include the full traceback
+        )
         print(f"Error: {str(e)}")
         return jsonify({
             "success": False,
