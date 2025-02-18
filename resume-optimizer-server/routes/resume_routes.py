@@ -107,6 +107,7 @@ def download_resume(resume_id):
                 "error": "Missing X-User-Id header"
             }), 401
 
+        sentry_sdk.capture_exception(Exception("Test exception 0"))
         # Get the resume content from the database
         supabase_response = supabase.table('resumes')\
             .select('content, title')\
@@ -120,6 +121,7 @@ def download_resume(resume_id):
         # Get the title and content
         title = supabase_response.data[0].get('title', 'document')
         resume_content = supabase_response.data[0].get('content')
+        sentry_sdk.capture_exception(Exception("Test exception 1"))
         
         if not resume_content:
             return jsonify({"error": "Resume content not found"}), 404
@@ -136,7 +138,7 @@ def download_resume(resume_id):
         filename = f"resume_{title}.pdf"  # Added .pdf extension
         sentry_sdk.capture_message(f"Resume Content (first 50 chars): {resume_content[:50]}", level="info")
         sentry_sdk.capture_message(f"Downloading pdf_data {pdf_data}", level="info")
-        sentry_sdk.capture_exception(Exception("Test exception"))
+        sentry_sdk.capture_exception(Exception("Test exception 2"))
         
         # Set the correct headers
         response.headers['Content-Type'] = 'application/pdf'
