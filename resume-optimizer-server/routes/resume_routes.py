@@ -18,6 +18,21 @@ supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_KEY')
 supabase: Client = create_client(supabase_url, supabase_key)
 
+# Add this temporary route to test PDF generation
+@resume_routes.route('/api/test-pdf', methods=['GET'])
+def test_pdf():
+    try:
+        test_content = "Test Resume\n\nSection 1\nThis is a test."
+        pdf_generator = PDFGenerator()
+        pdf_data = pdf_generator.create_pdf_from_text(test_content)
+        
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'attachment; filename="test.pdf"'
+        return response
+    except Exception as e:
+        return str(e), 500
+    
 @resume_routes.route('/api/resumes/<resume_id>/cover-letter/download', methods=['GET'])
 def download_cover_letter(resume_id):
     """Generate and download cover letter PDF from stored content"""
@@ -99,77 +114,52 @@ def get_resumes():
 
 @resume_routes.route('/api/resumes/<resume_id>/download', methods=['GET'])
 def download_resume(resume_id):
+    """Generate and download resume PDF from stored content"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"success": False, "error": "Missing X-User-Id header"}), 401
+            return jsonify({
+                "success": False,
+                "error": "Missing X-User-Id header"
+            }), 401
 
-        logger.info(f"Downloading resume: {resume_id} for user: {user_id}")
-        
-        # Get the resume content from the database
-        supabase_response = supabase.table('resumes')\
+        # Get the resume content from database
+        response = supabase.table('resumes')\
             .select('content, title')\
             .eq('id', resume_id)\
             .eq('user_id', user_id)\
             .execute()
 
-        if not supabase_response.data or len(supabase_response.data) == 0:
+        if not response.data:
             return jsonify({"error": "Resume not found or not authorized"}), 404
 
-        # Get the title and content
-        title = supabase_response.data[0].get('title', 'document')
-        resume_content = supabase_response.data[0].get('content')
-        
+        resume_content = response.data[0].get('content')
         if not resume_content:
             return jsonify({"error": "Resume content not found"}), 404
 
-        # Generate PDF from resume content
+        # Generate PDF
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
-        
-        # Validate PDF data
-        if not pdf_data or not isinstance(pdf_data, (bytes, BytesIO)):
-            logger.error(f"Invalid PDF data type: {type(pdf_data)}")
-            return jsonify({"error": "Failed to generate valid PDF"}), 500
 
-        # If pdf_data is BytesIO, get the bytes
-        if isinstance(pdf_data, BytesIO):
-            pdf_data = pdf_data.getvalue()
-
-        # Validate PDF header
-        if not pdf_data.startswith(b'%PDF-'):
-            logger.error("Generated data is not a valid PDF")
-            return jsonify({"error": "Generated file is not a valid PDF"}), 500
-
-        # Create response with PDF file
+        # Create response with PDF file - EXACTLY like cover letter
+        filename = f"resume_{response.data[0].get('title', 'document')}"
         response = make_response(pdf_data)
-        filename = f"{title.replace(' ', '_')}_{resume_id}.pdf"
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
         
-        # Force no caching
-        response.headers.update({
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': f'attachment; filename="{filename}"',
-            'Content-Length': len(pdf_data),
-            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'ETag': None,  # Remove ETag to prevent 304 responses
-            'Last-Modified': None  # Remove Last-Modified to prevent 304 responses
-        })
+        # Remove all caching headers
+        response.headers.pop('ETag', None)
+        response.headers.pop('Cache-Control', None)
+        response.headers.pop('Last-Modified', None)
         
         return response
 
     except Exception as e:
-        sentry_sdk.capture_exception(e)
-        logger.error(
-            f"PDF generation failed for resume {resume_id}: {str(e)}",
-            exc_info=True
-        )
+        print(f"Error generating resume PDF: {str(e)}")
         return jsonify({
             "success": False,
-            "error": f"Failed to generate PDF: {str(e)}"
+            "error": str(e)
         }), 500
-
 
 @resume_routes.route('/api/resumes/<resume_id>', methods=['DELETE'])
 def delete_resume(resume_id):
