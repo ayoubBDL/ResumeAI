@@ -15,3 +15,4 @@ supabase==1.0.3
 waitress==2.1.2
 loguru
 sentry-sdk
+blinker
