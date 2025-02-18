@@ -9,7 +9,7 @@ from services.pdf_generator import PDFGenerator
 from supabase import create_client, Client
 from flask import request, jsonify, make_response
 from loguru import logger
-
+from io import BytesIO
 # Create a Blueprint for user routes
 resume_routes = Blueprint('resume_routes', __name__)
 
@@ -102,12 +102,10 @@ def download_resume(resume_id):
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing X-User-Id header"
-            }), 401
+            return jsonify({"success": False, "error": "Missing X-User-Id header"}), 401
 
-        sentry_sdk.capture_exception(Exception("Test exception 0"))
+        logger.info(f"Downloading resume: {resume_id} for user: {user_id}")
+        
         # Get the resume content from the database
         supabase_response = supabase.table('resumes')\
             .select('content, title')\
@@ -121,7 +119,6 @@ def download_resume(resume_id):
         # Get the title and content
         title = supabase_response.data[0].get('title', 'document')
         resume_content = supabase_response.data[0].get('content')
-        sentry_sdk.capture_exception(Exception("Test exception 1"))
         
         if not resume_content:
             return jsonify({"error": "Resume content not found"}), 404
@@ -129,36 +126,45 @@ def download_resume(resume_id):
         # Generate PDF from resume content
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
+        
+        # Validate PDF data
+        if not pdf_data or not isinstance(pdf_data, (bytes, BytesIO)):
+            logger.error(f"Invalid PDF data type: {type(pdf_data)}")
+            return jsonify({"error": "Failed to generate valid PDF"}), 500
 
-        # Log the first 50 characters of the resume content
-        logger.info(f"Resume Content (first 50 chars): {resume_content[:50]}...")  # Log first 50 characters
+        # If pdf_data is BytesIO, get the bytes
+        if isinstance(pdf_data, BytesIO):
+            pdf_data = pdf_data.getvalue()
+
+        # Validate PDF header
+        if not pdf_data.startswith(b'%PDF-'):
+            logger.error("Generated data is not a valid PDF")
+            return jsonify({"error": "Generated file is not a valid PDF"}), 500
 
         # Create response with PDF file
         response = make_response(pdf_data)
-        filename = f"resume_{title}.pdf"  # Added .pdf extension
-        sentry_sdk.capture_message(f"Resume Content (first 50 chars): {resume_content[:50]}", level="info")
-        sentry_sdk.capture_message(f"Downloading pdf_data {pdf_data}", level="info")
-        sentry_sdk.capture_exception(Exception("Test exception 2"))
+        filename = f"{title.replace(' ', '_')}_{resume_id}.pdf"
         
-        # Set the correct headers
+        # Set the correct headers with proper encoding
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        logger.info(f"Downloading resume: {response}")
-        
-        # Important: Don't wrap the response in jsonify
+        response.headers['Content-Length'] = len(pdf_data)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+        logger.info(f"Successfully generated PDF for resume: {resume_id}, size: {len(pdf_data)} bytes")
         return response
 
     except Exception as e:
-        # For errors, we still want to return JSON
         sentry_sdk.capture_exception(e)
         logger.error(
-        f"An error occurred: {str(e)} and user_id: {user_id}",
-        exc_info=True,  # Include the full traceback
+            f"PDF generation failed for resume {resume_id}: {str(e)}",
+            exc_info=True
         )
-        print(f"Error: {str(e)}")
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": f"Failed to generate PDF: {str(e)}"
         }), 500
 
 
