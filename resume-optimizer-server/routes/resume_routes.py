@@ -141,19 +141,20 @@ def download_resume(resume_id):
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        # Create response with PDF file - EXACTLY like cover letter
-        filename = f"resume_{response.data[0].get('title', 'document')}"
         response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
-        
-        # Remove all caching headers
-        response.headers.pop('ETag', None)
-        response.headers.pop('Cache-Control', None)
-        response.headers.pop('Last-Modified', None)
+        filename = f"resume_{response.data[0].get('title', 'document')}"
+        response.headers.update({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename="{filename}.pdf"',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Surrogate-Control': 'no-store',  # Netlify-specific
+            'X-Accel-Expires': '0',  # Additional cache control
+            'Vary': '*'  # Force unique responses
+        })
         
         return response
-
     except Exception as e:
         print(f"Error generating resume PDF: {str(e)}")
         return jsonify({
