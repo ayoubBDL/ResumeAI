@@ -1,3 +1,4 @@
+from loguru import logger
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -192,8 +193,11 @@ class PDFGenerator:
         return line, 'NormalText'
 
     def create_pdf_from_text(self, text):
+        buffer = io.BytesIO()
         try:
-            buffer = io.BytesIO()
+            # Log the input text length for debugging
+            logger.info(f"Creating PDF from text of length: {len(text)}")
+            
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=letter,
@@ -206,6 +210,9 @@ class PDFGenerator:
             story = []
             lines = text.split('\n')
             is_first_content = True
+            
+            # Log number of lines being processed
+            logger.info(f"Processing {len(lines)} lines")
             
             for line in lines:
                 line = line.strip()
@@ -234,13 +241,30 @@ class PDFGenerator:
                 # Add extra space after sections
                 if style_name == 'SectionHeading':
                     story.append(Spacer(1, 8))
-                    
+            
+            # Log before building the PDF
+            logger.info(f"Building PDF with {len(story)} elements")
+            
             doc.build(story)
-            return buffer.getvalue()
+            
+            # Get the PDF data
+            pdf_data = buffer.getvalue()
+            
+            # Validate PDF data
+            if not pdf_data.startswith(b'%PDF-'):
+                raise ValueError("Generated data is not a valid PDF")
+                
+            # Log PDF size
+            logger.info(f"Successfully generated PDF of size: {len(pdf_data)} bytes")
+            
+            return pdf_data
             
         except Exception as e:
-            print(f"Error creating PDF: {str(e)}")
+            logger.error(f"Error creating PDF: {str(e)}", exc_info=True)
             raise
+        finally:
+            # Always close the buffer
+            buffer.close()
             
     def clean_text(self, text):
         """Clean extracted text by removing extra spaces and formatting"""
