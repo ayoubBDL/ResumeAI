@@ -114,7 +114,7 @@ def get_resumes():
 
 @resume_routes.route('/api/resumes/<resume_id>/download', methods=['GET'])
 def download_resume(resume_id):
-    """Generate and download resume PDF from stored content"""
+    """Generate and download resume PDF from stored content - copied from working cover letter route"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
@@ -123,7 +123,7 @@ def download_resume(resume_id):
                 "error": "Missing X-User-Id header"
             }), 401
 
-        # Get the resume content EXACTLY like cover letter
+        # Get the resume content from database - EXACTLY like cover letter
         response = supabase.table('resumes')\
             .select('content, title')\
             .eq('id', resume_id)\
@@ -137,21 +137,18 @@ def download_resume(resume_id):
         if not resume_content:
             return jsonify({"error": "Resume content not found"}), 404
 
-        # Generate PDF
+        # Generate PDF using the EXACT SAME method as cover letter
         pdf_generator = PDFGenerator()
-        pdf_data = pdf_generator.create_pdf_from_text(resume_content)
+        print(resume_content)
+        pdf_data = pdf_generator.create_cover_letter_pdf(resume_content)  # Use the working method!
 
-        # Force binary response with correct headers
-        response = make_response(bytes(pdf_data))  # Ensure binary data
-        response.headers.set('Content-Type', 'application/pdf')  # Force PDF content type
-        response.headers.set('Content-Disposition', f'attachment; filename="{response.data[0].get("title", "document")}.pdf"')
-        response.headers.set('Accept-Ranges', 'bytes')
-        response.headers.set('Content-Length', len(pdf_data))
-        
-        # Prevent content type modification
-        response.direct_passthrough = True
-        
-        return jsonify({"content": resume_content}), 200
+        # Create response EXACTLY like cover letter
+        filename = f"resume_{response.data[0].get('title', 'document')}"
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
+
+        return response
 
     except Exception as e:
         print(f"Error generating resume PDF: {str(e)}")
