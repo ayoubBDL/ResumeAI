@@ -145,15 +145,18 @@ def download_resume(resume_id):
         response = make_response(pdf_data)
         filename = f"{title.replace(' ', '_')}_{resume_id}.pdf"
         
-        # Set the correct headers with proper encoding
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response.headers['Content-Length'] = len(pdf_data)
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-
-        logger.info(f"Successfully generated PDF for resume: {resume_id}, size: {len(pdf_data)} bytes")
+        # Force no caching
+        response.headers.update({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Length': len(pdf_data),
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'ETag': None,  # Remove ETag to prevent 304 responses
+            'Last-Modified': None  # Remove Last-Modified to prevent 304 responses
+        })
+        
         return response
 
     except Exception as e:
