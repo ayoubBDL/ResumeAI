@@ -123,7 +123,7 @@ def download_resume(resume_id):
                 "error": "Missing X-User-Id header"
             }), 401
 
-        # Get the resume content from database
+        # Get the resume content EXACTLY like cover letter
         response = supabase.table('resumes')\
             .select('content, title')\
             .eq('id', resume_id)\
@@ -141,27 +141,20 @@ def download_resume(resume_id):
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        response = make_response(pdf_data)
+        # Create response EXACTLY like cover letter
         filename = f"resume_{response.data[0].get('title', 'document')}"
-        response.headers.update({
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': f'attachment; filename="{filename}.pdf"',
-            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'Surrogate-Control': 'no-store',  # Netlify-specific
-            'X-Accel-Expires': '0',  # Additional cache control
-            'Vary': '*'  # Force unique responses
-        })
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
         
         return response
+
     except Exception as e:
         print(f"Error generating resume PDF: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
-
 @resume_routes.route('/api/resumes/<resume_id>', methods=['DELETE'])
 def delete_resume(resume_id):
     """Endpoint to delete a resume"""
