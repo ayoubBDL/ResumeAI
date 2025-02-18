@@ -141,17 +141,21 @@ def download_resume(resume_id):
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        # Force binary response with correct headers
-        response = make_response(bytes(pdf_data))  # Ensure binary data
-        response.headers.set('Content-Type', 'application/pdf')  # Force PDF content type
-        response.headers.set('Content-Disposition', f'attachment; filename="{response.data[0].get("title", "document")}.pdf"')
-        response.headers.set('Accept-Ranges', 'bytes')
-        response.headers.set('Content-Length', len(pdf_data))
-        
-        # Prevent content type modification
-        response.direct_passthrough = True
-        
-        return response
+        # Instead of make_response, use send_file
+        from flask import send_file
+        from io import BytesIO
+
+        # Create BytesIO object
+        pdf_buffer = BytesIO(pdf_data)
+        pdf_buffer.seek(0)  # Move to start of buffer
+
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"{response.data[0].get('title', 'document')}.pdf",
+            max_age=0
+        )
 
     except Exception as e:
         print(f"Error generating resume PDF: {str(e)}")
