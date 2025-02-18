@@ -143,6 +143,14 @@ def handle_exception(e):
     # Return a JSON response with the error message
     return jsonify({"success": False, "error": str(e), "user_id": user_id}), 500
 
+@app.route('/')
+def home():
+    """Root endpoint providing API information"""
+    return jsonify({
+        "message": "Hello World",
+        "status": "healthy",
+    })
+
 def validate_environment():
     """Validate required environment variables"""
     required_vars = [
