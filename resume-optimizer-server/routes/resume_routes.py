@@ -141,11 +141,15 @@ def download_resume(resume_id):
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        # Create response EXACTLY like cover letter
-        filename = f"resume_{response.data[0].get('title', 'document')}"
-        response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
+        # Force binary response with correct headers
+        response = make_response(bytes(pdf_data))  # Ensure binary data
+        response.headers.set('Content-Type', 'application/pdf')  # Force PDF content type
+        response.headers.set('Content-Disposition', f'attachment; filename="{response.data[0].get("title", "document")}.pdf"')
+        response.headers.set('Accept-Ranges', 'bytes')
+        response.headers.set('Content-Length', len(pdf_data))
+        
+        # Prevent content type modification
+        response.direct_passthrough = True
         
         return response
 
@@ -155,6 +159,7 @@ def download_resume(resume_id):
             "success": False,
             "error": str(e)
         }), 500
+    
 @resume_routes.route('/api/resumes/<resume_id>', methods=['DELETE'])
 def delete_resume(resume_id):
     """Endpoint to delete a resume"""
