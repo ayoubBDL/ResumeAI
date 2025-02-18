@@ -10,6 +10,7 @@ from waitress import serve
 from supabase import create_client, Client
 from loguru import logger
 import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 # Import route blueprints
 from routes.job_routes import job_routes
 from routes.user_routes import user_routes
@@ -22,24 +23,12 @@ from routes.optimize_routes import optimize_routes
 # Load environment variables
 load_dotenv()
 
-# Configure Loguru for production
-logger.add("app.log", rotation="10 MB", level="ERROR")  # Log errors to a file
-logger.add(sys.stdout, level="ERROR")  
 
 sentry_sdk.init(
-    dsn=os.getenv('SENTRY_DSN'),
-    # Add data like request headers and IP for users,
-    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-    send_default_pii=True,
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for tracing.
+    dsn=os.getenv("SENTRY_DSN"),
+    integrations=[FlaskIntegration()],
     traces_sample_rate=1.0,
-    _experiments={
-        # Set continuous_profiling_auto_start to True
-        # to automatically start the profiler on when
-        # possible.
-        "continuous_profiling_auto_start": True,
-    },
+    debug=True,  # Enable debug mode for troubleshooting
 )
 # Validate and set OpenAI API key
 api_key = os.getenv('OPENAI_API_KEY')
@@ -143,6 +132,14 @@ def handle_exception(e):
     # Return a JSON response with the error message
     return jsonify({"success": False, "error": str(e), "user_id": user_id}), 500
 
+@app.route('/test-sentry')
+def test_sentry():
+    try:
+        raise ValueError("This is a test error for Sentry")
+    except Exception as e:
+        sentry_sdk.capture_exception(e)  # Send the error to Sentry
+        return jsonify({"success": False, "error": str(e)}), 500
+    
 @app.route('/')
 def home():
     """Root endpoint providing API information"""
