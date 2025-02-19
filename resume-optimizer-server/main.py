@@ -28,7 +28,6 @@ sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
     integrations=[FlaskIntegration()],
     traces_sample_rate=1.0,
-    debug=True,  # Enable debug mode for troubleshooting
 )
 # Validate and set OpenAI API key
 api_key = os.getenv('OPENAI_API_KEY')

@@ -72,7 +72,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-center h-24 px-4 border-b">
-            <Link to="/dashboard" className="flex items-center">
+            <Link to="/" className="flex items-center">
               <img
                 src={logo}
                 alt="ResumeAI Logo"
