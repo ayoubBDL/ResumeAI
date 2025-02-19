@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Resume, deleteResume } from '../services/api';
+import { Resume, deleteResume, downloadResume } from '../services/api';
 import AnalysisModal from './AnalysisModal';
 import ConfirmModal from './ConfirmModal';
 import { Download, FileText, Trash2 } from 'lucide-react';
@@ -17,48 +17,19 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleDownload = async () => {
+  const handleDownload = async (resumeId: string, jobTitle: string) => {
     try {
       setIsDownloading(true);
       setError(null);
       
-      // Get the PDF directly from the backend
-      const response = await fetch(`/api/resumes/${resume.id}/download`, {
-        method: 'GET',
-        headers: {
-          'X-User-Id': resume.user_id
-        }
-      });
-  
-      if (!response.ok) {
-        // Try to parse error message if it's JSON
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to download PDF');
-        } catch (e) {
-          throw new Error('Failed to download PDF');
-        }
-      }
-  
-      // Get the filename from the Content-Disposition header if available
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `${resume.title || 'resume'}.pdf`;
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-  
-      // Convert response to blob
-      const pdfBlob = await response.blob();
+      // Get the cover letter PDF blob
+      const pdfBlob = await downloadResume(resumeId);
+      
+      // Create a download link
       const blobUrl = window.URL.createObjectURL(pdfBlob);
-  
-      // Create a temporary link element to trigger download
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', filename);
-      link.style.display = 'none';
+      link.setAttribute('download', `${jobTitle || 'document'}.pdf`);
       document.body.appendChild(link);
       link.click();
       
@@ -66,8 +37,8 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Error downloading resume:', error);
-      setError(error instanceof Error ? error.message : 'Failed to download resume');
+      console.error('Error downloading cover letter:', error);
+      setError(error instanceof Error ? error.message : 'Failed to download cover letter');
     } finally {
       setIsDownloading(false);
     }
@@ -135,7 +106,7 @@ export default function ResumeCard({ resume, onUpdate }: ResumeCardProps) {
         <div className="flex space-x-2">
           {resume && (
             <button
-              onClick={handleDownload}
+              onClick={() => handleDownload(resume.id, resume.title)}
               disabled={isDownloading || isDeleting}
               className="p-2 text-gray-600 hover:text-indigo-600 transition-colors disabled:opacity-50"
               title="Download PDF"

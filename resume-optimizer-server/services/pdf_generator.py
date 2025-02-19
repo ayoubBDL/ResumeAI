@@ -192,10 +192,11 @@ class PDFGenerator:
         
         return line, 'NormalText'
 
-    def create_pdf_from_text(self, text: str) -> bytes:
-        """Create a PDF from resume text"""
+    def create_pdf_from_text(self, text):
+        buffer = io.BytesIO()
         try:
-            buffer = io.BytesIO()
+            # Log the input text length for debugging
+            logger.info(f"Creating PDF from text of length: {len(text)}")
             
             doc = SimpleDocTemplate(
                 buffer,
@@ -206,57 +207,65 @@ class PDFGenerator:
                 bottomMargin=0.75*inch
             )
             
-            # Use simple styling like cover letter
-            styles = getSampleStyleSheet()
-            normal_style = ParagraphStyle(
-                'ResumeBody',
-                parent=styles['Normal'],
-                fontSize=12,
-                fontName='Helvetica',
-                leading=16,
-                spaceBefore=12,
-                spaceAfter=12
-            )
-            
-            header_style = ParagraphStyle(
-                'ResumeHeader',
-                parent=styles['Normal'],
-                fontSize=14,
-                fontName='Helvetica-Bold',
-                leading=16,
-                spaceBefore=12,
-                spaceAfter=12
-            )
-            
             story = []
             lines = text.split('\n')
-            is_first_line = True
+            is_first_content = True
+            
+            # Log number of lines being processed
+            logger.info(f"Processing {len(lines)} lines")
             
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
-                    
-                # Skip separator lines
-                if line.startswith('---') or line.startswith('==='):
+                
+                # Skip separator lines and age
+                if (line.startswith('---') or 
+                    line.startswith('===') or 
+                    line == '---' or 
+                    re.match(r'^\d+\s*yo\s*$', line, re.IGNORECASE)):
                     continue
                     
-                # Use header style for first line and section headers
-                if is_first_line or line.isupper():
-                    story.append(Paragraph(line, header_style))
-                    is_first_line = False
-                else:
-                    story.append(Paragraph(line, normal_style))
+                # Process the line formatting
+                processed_text, style_name = self._process_text_formatting(line)
+                
+                # Handle first line (name) specially
+                if is_first_content:
+                    story.append(Paragraph(processed_text, self.styles['Name']))
+                    is_first_content = False
+                    continue
+                
+                # Add the processed text with appropriate style
+                story.append(Paragraph(processed_text, self.styles[style_name]))
+                
+                # Add extra space after sections
+                if style_name == 'SectionHeading':
+                    story.append(Spacer(1, 8))
+            
+            # Log before building the PDF
+            logger.info(f"Building PDF with {len(story)} elements")
             
             doc.build(story)
+            
+            # Get the PDF data
             pdf_data = buffer.getvalue()
-            buffer.close()
+            
+            # Validate PDF data
+            if not pdf_data.startswith(b'%PDF-'):
+                raise ValueError("Generated data is not a valid PDF")
+                
+            # Log PDF size
+            logger.info(f"Successfully generated PDF of size: {len(pdf_data)} bytes")
             
             return pdf_data
             
         except Exception as e:
-            print(f"Error creating resume PDF: {str(e)}")
-            raise       
+            logger.error(f"Error creating PDF: {str(e)}", exc_info=True)
+            raise
+        finally:
+            # Always close the buffer
+            buffer.close()
+            
     def clean_text(self, text):
         """Clean extracted text by removing extra spaces and formatting"""
         lines = text.splitlines()

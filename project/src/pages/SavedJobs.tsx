@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getJobApplications, updateJobApplicationStatus, deleteJobApplication, JobApplication, downloadCoverLetter } from '../services/api';
+import { getJobApplications, updateJobApplicationStatus, deleteJobApplication, JobApplication, downloadCoverLetter, downloadResume } from '../services/api';
 import { format } from 'date-fns';
 import { Building2, Calendar, ExternalLink, Search, BookOpen, Download, FileText, Trash2 } from 'lucide-react';
 import AnalysisModal from '../components/AnalysisModal';
@@ -60,37 +60,19 @@ function SavedJobs() {
     };
   }, [user?.id]);
 
-  const handleDownload = async (resumeId: string, jobTitle: string, userId: string) => {
+  const handleDownload = async (resumeId: string, jobTitle: string) => {
     try {
       setIsDownloading(true);
       setError(null);
       
-      // Get the PDF directly from the backend
-      const response = await fetch(`/api/resumes/${resumeId}/download`, {
-        method: 'GET',
-        headers: {
-          'X-User-Id': userId
-        }
-      });
-  
-      if (!response.ok) {
-        // Try to parse error message if it's JSON
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to download PDF');
-        } catch (e) {
-          throw new Error('Failed to download PDF');
-        }
-      }
-      // Convert response to blob
-      const pdfBlob = await response.blob();
+      // Get the cover letter PDF blob
+      const pdfBlob = await downloadResume(resumeId);
+      
+      // Create a download link
       const blobUrl = window.URL.createObjectURL(pdfBlob);
-  
-      // Create a temporary link element to trigger download
       const link = document.createElement('a');
       link.href = blobUrl;
       link.setAttribute('download', `resume_${jobTitle || 'document'}.pdf`);
-      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       
@@ -98,8 +80,8 @@ function SavedJobs() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Error downloading resume:', error);
-      setError(error instanceof Error ? error.message : 'Failed to download resume');
+      console.error('Error downloading cover letter:', error);
+      setError(error instanceof Error ? error.message : 'Failed to download cover letter');
     } finally {
       setIsDownloading(false);
     }
@@ -280,7 +262,7 @@ function SavedJobs() {
                       {job.resume_id && (
                         <>
                           <button
-                            onClick={() => handleDownload(job.resume_id!, job.job_title, user?.id || '')}
+                            onClick={() => handleDownload(job.resume_id!, job.job_title)}
                             disabled={isDownloading}
                             className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                           >

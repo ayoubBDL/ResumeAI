@@ -140,7 +140,7 @@ def download_resume(resume_id):
         # Generate PDF using the EXACT SAME method as cover letter
         pdf_generator = PDFGenerator()
         print(resume_content)
-        pdf_data = pdf_generator.create_cover_letter_pdf(resume_content)  # Use the working method!
+        pdf_data = pdf_generator.create_pdf_from_text(resume_content)  # Use the working method!
 
         # Create response EXACTLY like cover letter
         filename = f"resume_{response.data[0].get('title', 'document')}"

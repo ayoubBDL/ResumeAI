@@ -144,54 +144,23 @@ export async function deleteResume(id: string): Promise<void> {
 }
 
 // Get resume download URL
-export const getResumeDownloadUrl = async (resumeId: string, jobTitle?: string) => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-      throw new Error('Not authenticated');
-    }
-
-    // First get the signed URL
-    const response = await fetch(`/api/resumes/${resumeId}/download`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Id': session.user.id
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to get download URL');
-    }
-
-    const data = await response.json();
-    if (!data.success || !data.url) {
-      throw new Error(data.error || 'Failed to get download URL');
-    }
-
-    // Now fetch the actual PDF using the signed URL
-    const pdfResponse = await fetch(data.url);
-    if (!pdfResponse.ok) {
-      throw new Error('Failed to download PDF');
-    }
-
-    const pdfBlob = await pdfResponse.blob();
-    const blobUrl = window.URL.createObjectURL(pdfBlob);
-    
-    // Create and click download link
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = `${jobTitle || 'resume'}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Cleanup
-    window.URL.revokeObjectURL(blobUrl);
-    document.body.removeChild(a);
-  } catch (error) {
-    console.error('Error downloading resume:', error);
-    throw error;
+export const downloadResume = async (resumeId: string) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    throw new Error('Not authenticated');
   }
+
+  const response = await fetch(`${API_URL}/api/resumes/${resumeId}/download`, {
+    headers: {
+      'X-User-Id': session.user.id
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to download cover letter');
+  }
+
+  return await response.blob();
 };
 
 // Get cover letter download URL and content
