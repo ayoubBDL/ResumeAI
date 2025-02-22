@@ -195,13 +195,14 @@ FINAL CHECK - VERIFY:
 
          CRITICAL - ABSOLUTELY REQUIRED RULES:
          1. JOB MATCHING (HIGHEST PRIORITY):
-            ‼️ Write ALL content in the DETECTED LANGUAGE from Job description
-            ‼️ Analyze the job description thoroughly
-            ‼️ Identify key requirements, skills, and qualifications
-            ‼️ Reorganize and emphasize resume content to match job requirements
-            ‼️ Use similar terminology as the job description
-            ‼️ Highlight experiences that directly relate to job requirements
-            ‼️ Ensure technical skills match what's asked in the job
+            !! Write ALL content in the DETECTED LANGUAGE from Job description
+            !! Analyze the job description thoroughly
+            !! Identify key requirements, skills, and qualifications
+            !! Reorganize and emphasize resume content to match job requirements
+            !! Use similar terminology as the job description
+            !! Highlight experiences that directly relate to job requirements
+            !! PLEASE DO NOT FORGET TO ADD THE CANDIDATE TITLE AFTER THE NAME eg Software Engineer, Product Manager, etc !! 
+            !! Ensure technical skills match what's asked in the job
             - **Summarize concisely**: Reduce each role's responsibilities into two strong bullet points.  
             - **Prioritize impact**: Focus on the most significant contributions and achievements.  
             - **Use action verbs**: Ensure each bullet starts with a strong action verb.  
@@ -218,16 +219,16 @@ FINAL CHECK - VERIFY:
            !! CONTACT INFORMATION MUST BE IN THE DETECTED LANGUAGE IT IS CRITICAL !!
 
          3. LANGUAGE AND FORMATTING:
-            ‼️ Use CONSISTENT language throughout (based on job description Make sure to write in the DETECTED LANGUAGE!!)
-            ‼️ Format dates according to language (French: "24 juin 2024", English: "June 24, 2024")
-            ‼️ NO duplicate sections or titles
-            ‼️ NO scattered projects - keep ALL projects in ONE section
-            ‼️ Maintain consistent capitalization and style in section titles
+            !! Use CONSISTENT language throughout (based on job description Make sure to write in the DETECTED LANGUAGE!!)
+            !! Format dates according to language (French: "24 juin 2024", English: "June 24, 2024")
+            !! NO duplicate sections or titles
+            !! NO scattered projects - keep ALL projects in ONE section
+            !! Maintain consistent capitalization and style in section titles
 
          PART 1: OPTIMIZED RESUME
          =======================
          Create a clean, professional resume with these sections:
-         1. Contact Information (keep original details)
+         1. Contact Information (keep original details with the detected language) AND make sure to add title after the name AND MAKE TITLE BEFORE CONATACT INFO !!
          2. Professional Summary (concise, impactful)
          3. Technical Skills (prioritize job-relevant skills)
          4. Professional Experience (emphasize relevant achievements)

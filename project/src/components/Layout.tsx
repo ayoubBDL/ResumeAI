@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FileText, BookmarkCheck, LogOut, Home, Settings, CreditCard, Menu, X } from 'lucide-react';
+import { FileText, BookmarkCheck, LogOut, Home, Settings, CreditCard, Menu, X, Edit2Icon } from 'lucide-react';
 import logo from '../assets/logo.png';
 
 const navigation = [
@@ -24,6 +24,11 @@ const navigation = [
     name: 'Credits & Plans',
     href: '/billing',
     icon: CreditCard,
+  },
+  {
+    name: 'Edit Resume',
+    href: '/edit-resume',
+    icon: Edit2Icon,
   }
 ];
 

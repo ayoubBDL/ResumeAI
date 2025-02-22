@@ -18,11 +18,13 @@ class PDFGenerator:
 
     def _setup_custom_styles(self):
         """Set up all custom styles for the PDF"""
-        # Define colors
+        # Define modern color scheme
         self.colors = {
-            'primary': colors.HexColor('#2C3E50'),
-            'secondary': colors.HexColor('#34495E'),
-            'text': colors.HexColor('#2D3748')
+            'primary': colors.HexColor('#1a365d'),    # Deep blue
+            'secondary': colors.HexColor('#2b6cb0'),  # Medium blue
+            'accent': colors.HexColor('#4299e1'),     # Light blue
+            'text': colors.HexColor('#2d3748'),       # Dark gray
+            'subtext': colors.HexColor('#718096')     # Medium gray
         }
 
         # Remove existing styles if they exist

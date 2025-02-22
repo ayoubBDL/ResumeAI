@@ -17,6 +17,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { CreditsProvider } from './context/CreditsContext';
 import Settings from './pages/Settings';
+import EditResume from './components/EditResume';
 
 
 interface PrivateRouteProps {
@@ -87,6 +88,11 @@ function App() {
                 <Route path="/settings" element={
                   <PrivateRoute>
                     <Settings />
+                  </PrivateRoute>
+                } />
+                <Route path="/edit-resume" element={
+                  <PrivateRoute>
+                    <EditResume />
                   </PrivateRoute>
                 } />
               </Routes>
