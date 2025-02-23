@@ -122,12 +122,6 @@ def optimize_resume():
 
             # Create job application if we have job details
             if job_description:
-                print(f"Creating job application with details:", {
-                    'job_title': job_title or 'Untitled Position',
-                    'company': company or 'Unknown Company',
-                    'has_description': bool(job_description)
-                })
-                
                 try:
                     job_data = {
                         'user_id': user_id,
@@ -144,7 +138,6 @@ def optimize_resume():
                         .insert(job_data) \
                         .execute()
                         
-                    print(f"Job application created:", job_result.data if job_result else None)
                 except Exception as job_error:
                     print(f"Error creating job application: {str(job_error)}")
                     # Don't raise the error as this is not critical

@@ -34,9 +34,9 @@ function Dashboard() {
         setProgress(prev => {
           const newProgress = prev + Math.random() * 15;
           // Update progress message based on progress
-          if (newProgress < 30) {
+          if (newProgress < 20) {
             setProgressMessage('Analyzing resume and job description...');
-          } else if (newProgress < 60) {
+          } else if (newProgress < 80) {
             setProgressMessage('Generating optimized resume...');
           } else if (newProgress < 90) {
             setProgressMessage('Creating personalized cover letter...');
@@ -44,10 +44,7 @@ function Dashboard() {
           if (prev >= 90) return prev; // Cap at 90% until complete
           return newProgress;
         });
-      }, 500);
-    } else {
-      setProgress(100);
-      setProgressMessage('');
+      }, 800);
     }
     return () => clearInterval(interval);
   }, [isUploading]);

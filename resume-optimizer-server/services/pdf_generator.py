@@ -21,7 +21,7 @@ class PDFGenerator:
         # Define modern color scheme
         self.colors = {
             'primary': colors.HexColor('#1a365d'),    # Deep blue
-            'secondary': colors.HexColor('#2b6cb0'),  # Medium blue
+            'secondary': colors.HexColor('#1b3857'),  # Medium blue
             'accent': colors.HexColor('#4299e1'),     # Light blue
             'text': colors.HexColor('#2d3748'),       # Dark gray
             'subtext': colors.HexColor('#718096')     # Medium gray

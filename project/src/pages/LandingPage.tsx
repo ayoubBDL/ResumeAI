@@ -8,7 +8,7 @@ function LandingPage() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm shadow-sm fixed w-full z-50">
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -52,38 +52,65 @@ function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <div className="relative pt-16">
-        <div className="absolute inset-0">
-          <img 
-            src="https://images.unsplash.com/photo-1497032628192-86f99bcd76bc"
-            alt="Professional workspace"
-            className="w-full h-full object-cover opacity-65"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/95 via-white/90 to-gray-50/95 mix-blend-overlay" />
-        </div>
-        <div className="relative max-w-7xl mx-auto py-24 px-4 sm:py-32 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl tracking-tight font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
-              Land Your Dream Job with an{' '}
-              <span className="text-indigo-600">AI-Powered</span>
-              <br />
-              <span className="text-gray-900">Resume</span>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row items-center justify-between pt-32 pb-16">
+          {/* Text Content */}
+          <div className="lg:w-1/2 space-y-8 text-center lg:text-left">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+              Transform Your Resume with
+              <span className="text-blue-600"> AI-Powered </span>
+              Optimization
             </h1>
-            <p className="mt-6 max-w-2xl mx-auto text-lg text-gray-600">
-              Transform your resume into a perfectly tailored match for any job in seconds. Upload once, customize for every application.
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl">
+              Enhance your job application with our intelligent resume optimization tool. 
+              Get tailored suggestions, ATS-friendly formatting, and expert insights to 
+              land your dream job.
             </p>
-            <div className="mt-10">
-              <Link
-                to="/signup"
-                className="inline-flex items-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 md:text-lg md:px-10 transition-all duration-200 hover:shadow-lg"
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <Link 
+                to={user ? "/dashboard" : "/login"}
+                className="inline-flex items-center px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 
+                         text-white font-semibold transition-colors duration-200"
               >
-                Get Started Free{' '}
-                <ArrowRight className="ml-2 -mr-1 w-5 h-5" aria-hidden="true" />
+                Get Started <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
+              <a 
+                href="#features"
+                className="inline-flex items-center px-6 py-3 rounded-lg border-2 border-gray-300 
+                         hover:border-gray-400 text-gray-700 font-semibold transition-colors duration-200"
+              >
+                Learn More
+              </a>
+            </div>
+            <div className="flex items-center justify-center lg:justify-start gap-8 pt-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span className="text-gray-600">ATS-Friendly</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span className="text-gray-600">AI-Powered</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <span className="text-gray-600">Instant Results</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Resume Image */}
+          <div className="lg:w-1/2 mt-12 lg:mt-0">
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-100 rounded-lg transform rotate-3"></div>
+              <img
+                src="https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&q=80"
+                alt="Professional Resume Example"
+                className="relative rounded-lg shadow-xl transform -rotate-3 hover:rotate-0 transition-transform duration-300"
+              />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* How It Works */}
       <section className="bg-white py-20" id="how-it-works">
