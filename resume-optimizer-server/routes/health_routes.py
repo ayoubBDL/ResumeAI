@@ -1,13 +1,13 @@
-from flask import Blueprint, jsonify
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 import time
 
-# Create a Blueprint for health routes
-health_routes = Blueprint('health_routes', __name__)
+app = FastAPI()
 
-@health_routes.route('/health', methods=['GET'])
+@app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return jsonify({
+    return JSONResponse(content={
         "status": "healthy",
         "timestamp": time.time()
-    }) 
+    })

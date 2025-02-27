@@ -16,3 +16,6 @@ waitress==2.1.2
 loguru
 sentry-sdk
 blinker
+uvicorn
+fastapi
+pydantic

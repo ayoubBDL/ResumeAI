@@ -1,2 +1,5 @@
 .env
 project\.env
+services/__pycache__/.
+routes/__pycache__/.
+__pycache__/.

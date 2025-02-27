@@ -1,50 +1,42 @@
-from flask import Blueprint, request, jsonify
-import sentry_sdk
+from fastapi import FastAPI, Request, HTTPException, APIRouter
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 import os
-import os
-from flask import request, jsonify, make_response
 from services.supabase_client import supabase
 from services.pdf_generator import PDFGenerator
-from supabase import create_client, Client
-from flask import request, jsonify, make_response
 from loguru import logger
 from io import BytesIO
-# Create a Blueprint for user routes
-resume_routes = Blueprint('resume_routes', __name__)
+from dotenv import load_dotenv
 
 # Initialize Supabase client
 supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_KEY')
 supabase: Client = create_client(supabase_url, supabase_key)
+load_dotenv()
 
-# Add this temporary route to test PDF generation
-@resume_routes.route('/api/test-pdf', methods=['GET'])
-def test_pdf():
+router = APIRouter()
+
+@router.get("/api/test-pdf")
+async def test_pdf():
     try:
         test_content = "Test Resume\n\nSection 1\nThis is a test."
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_pdf_from_text(test_content)
         
-        response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = 'attachment; filename="test.pdf"'
-        return response
+        return StreamingResponse(BytesIO(pdf_data), media_type="application/pdf", headers={
+            "Content-Disposition": 'attachment; filename="test.pdf"'
+        })
     except Exception as e:
-        return str(e), 500
-    
-@resume_routes.route('/api/resumes/<resume_id>/cover-letter/download', methods=['GET'])
-def download_cover_letter(resume_id):
-    """Generate and download cover letter PDF from stored content"""
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/resumes/{resume_id}/cover-letter/download")
+async def download_cover_letter(resume_id: str, request: Request):
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing X-User-Id header"
-            }), 401
+            raise HTTPException(status_code=401, detail="Missing X-User-Id header")
 
-        # Get the cover letter content from database
         response = supabase.table('resumes')\
             .select('cover_letter, title')\
             .eq('id', resume_id)\
@@ -52,45 +44,31 @@ def download_cover_letter(resume_id):
             .execute()
 
         if not response.data:
-            return jsonify({"error": "Resume not found or not authorized"}), 404
+            raise HTTPException(status_code=404, detail="Resume not found or not authorized")
 
         cover_letter = response.data[0].get('cover_letter')
         if not cover_letter:
-            return jsonify({"error": "Cover letter not found"}), 404
+            raise HTTPException(status_code=404, detail="Cover letter not found")
 
-        # Generate PDF from cover letter content
         pdf_generator = PDFGenerator()
         pdf_data = pdf_generator.create_cover_letter_pdf(cover_letter)
 
-        # Create response with PDF file
         filename = f"cover_letter_{response.data[0].get('title', 'document')}"
-        response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
-        return response
-
+        return StreamingResponse(BytesIO(pdf_data), media_type="application/pdf", headers={
+            "Content-Disposition": f'attachment; filename="{filename}.pdf"'
+        })
     except Exception as e:
-        print(f"Error generating cover letter PDF: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        logger.error(f"Error generating cover letter PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@resume_routes.route('/api/resumes', methods=['GET'])
-def get_resumes():
-    """Endpoint to get all resumes"""
+@router.get("/api/resumes")
+async def get_resumes(request: Request, limit: int = None):
     try:
+        print("Getting resumes")
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing X-User-Id header"
-            }), 401
+            raise HTTPException(status_code=401, detail="Missing X-User-Id header")
 
-        # Get limit from query params, default to None (all resumes)
-        limit = request.args.get('limit', type=int)
-
-        # Fetch resumes from Supabase
         query = supabase.table('resumes')\
             .select('*')\
             .eq('user_id', user_id)\
@@ -102,28 +80,20 @@ def get_resumes():
         response = query.execute()
 
         if not response.data:
-            return jsonify([])  # Return empty list if no resumes found
+            return JSONResponse(content=[])
 
-        return jsonify(response.data)
+        return JSONResponse(content=response.data)
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        logger.error(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@resume_routes.route('/api/resumes/<resume_id>/download', methods=['GET'])
-def download_resume(resume_id):
-    """Generate and download resume PDF from stored content - copied from working cover letter route"""
+@router.get("/api/resumes/{resume_id}/download")
+async def download_resume(resume_id: str, request: Request):
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing X-User-Id header"
-            }), 401
+            raise HTTPException(status_code=401, detail="Missing X-User-Id header")
 
-        # Get the resume content from database - EXACTLY like cover letter
         response = supabase.table('resumes')\
             .select('content, title')\
             .eq('id', resume_id)\
@@ -131,44 +101,30 @@ def download_resume(resume_id):
             .execute()
 
         if not response.data:
-            return jsonify({"error": "Resume not found or not authorized"}), 404
+            raise HTTPException(status_code=404, detail="Resume not found or not authorized")
 
         resume_content = response.data[0].get('content')
         if not resume_content:
-            return jsonify({"error": "Resume content not found"}), 404
+            raise HTTPException(status_code=404, detail="Resume content not found")
 
-        # Generate PDF using the EXACT SAME method as cover letter
         pdf_generator = PDFGenerator()
-        print(resume_content)
-        pdf_data = pdf_generator.create_pdf_from_text(resume_content)  # Use the working method!
+        pdf_data = pdf_generator.create_pdf_from_text(resume_content)
 
-        # Create response EXACTLY like cover letter
         filename = f"resume_{response.data[0].get('title', 'document')}"
-        response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
-
-        return response
-
+        return StreamingResponse(BytesIO(pdf_data), media_type="application/pdf", headers={
+            "Content-Disposition": f'attachment; filename="{filename}.pdf"'
+        })
     except Exception as e:
-        print(f"Error generating resume PDF: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-    
-@resume_routes.route('/api/resumes/<resume_id>', methods=['DELETE'])
-def delete_resume(resume_id):
-    """Endpoint to delete a resume"""
+        logger.error(f"Error generating resume PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/api/resumes/{resume_id}")
+async def delete_resume(resume_id: str, request: Request):
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing X-User-Id header"
-            }), 401
+            raise HTTPException(status_code=401, detail="Missing X-User-Id header")
 
-        # First get the resume to check ownership and get the file path
         response = supabase.table('resumes')\
             .select('optimized_pdf_url')\
             .eq('id', resume_id)\
@@ -176,35 +132,27 @@ def delete_resume(resume_id):
             .execute()
 
         if not response.data:
-            return jsonify({"error": "Resume not found or not authorized"}), 404
+            raise HTTPException(status_code=404, detail="Resume not found or not authorized")
 
         optimized_pdf_url = response.data[0].get('optimized_pdf_url')
         if optimized_pdf_url:
-            # Extract the file path from the URL
             try:
                 file_path = optimized_pdf_url.split('/resumes/')[1].split('?')[0]
-                # Delete the file from storage
                 supabase.storage.from_('resumes').remove([file_path])
             except Exception as e:
-                print(f"Warning: Failed to delete file from storage: {str(e)}")
+                logger.warning(f"Warning: Failed to delete file from storage: {str(e)}")
 
-        # Delete the database record
         supabase.table('resumes')\
             .delete()\
             .eq('id', resume_id)\
             .eq('user_id', user_id)\
             .execute()
 
-        return jsonify({"success": True})
-
+        return JSONResponse(content={"success": True})
     except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        logger.error(f"Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@resume_routes.route('/upload', methods=['POST'])
-def upload_file():
-    # Remove the delete endpoint since we're handling it in the frontend
+@router.post("/upload")
+async def upload_file():
     pass

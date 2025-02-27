@@ -10,6 +10,9 @@ import uuid
 import io
 import re
 from datetime import datetime
+import logging
+import PyPDF2
+from fastapi import UploadFile
 
 class PDFGenerator:
     def __init__(self):
@@ -280,34 +283,17 @@ class PDFGenerator:
         
         return '\n'.join(cleaned_lines)
 
-    def extract_text_from_pdf(self, file_storage):
-        """Extract text from uploaded PDF file"""
+    async def extract_text_from_pdf(self, file_storage: UploadFile) -> str:
         try:
-            print(f"[PDF Extraction] Starting PDF text extraction for file: {file_storage.filename}")
-            
-            pdf_bytes = io.BytesIO(file_storage.read())
-            print("[PDF Extraction] Successfully read file into buffer")
-            
-            text_content = []
-            with pdfplumber.open(pdf_bytes) as pdf:
-                num_pages = len(pdf.pages)
-                print(f"[PDF Extraction] PDF has {num_pages} pages")
-                
-                for i, page in enumerate(pdf.pages):
-                    page_text = page.extract_text(layout=True)
-                    if page_text:
-                        cleaned_text = self.clean_text(page_text)
-                        text_content.append(cleaned_text)
-                    print(f"[PDF Extraction] Extracted {len(page_text) if page_text else 0} characters from page {i+1}")
-            
-            final_text = "\n\n".join(text_content).strip()
-            print(f"[PDF Extraction] Total extracted text length: {len(final_text)} characters")
-            
-            return final_text
-            
+            pdf_bytes = io.BytesIO(await file_storage.read())
+            pdf_reader = PyPDF2.PdfReader(pdf_bytes)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+            return text
         except Exception as e:
-            print(f"[PDF Extraction ERROR] Error extracting text from PDF: {str(e)}")
-            raise Exception("Failed to extract text from PDF file")
+            logging.error(f"PDF extraction error: {str(e)}")
+            raise ValueError(f"Failed to extract text from PDF: {str(e)}")
 
     async def generate(self, content: dict) -> str:
         """Generate a PDF file from the optimized resume content"""
@@ -388,4 +374,4 @@ class PDFGenerator:
             
         except Exception as e:
             print(f"Error creating cover letter PDF: {str(e)}")
-            raise
+            raise ValueError("Failed to create cover letter PDF")

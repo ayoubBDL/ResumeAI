@@ -1,54 +1,43 @@
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from supabase import create_client, Client
 import os
 
-# Create a Blueprint for user routes
-user_routes = Blueprint('user_routes', __name__)
+router = APIRouter()
 
 # Initialize Supabase client
 supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_KEY')
 supabase: Client = create_client(supabase_url, supabase_key)
 
-@user_routes.route('/api/users/profile', methods=['PUT'])
-def update_user_profile():
-    """Update user profile"""
+class ProfileUpdate(BaseModel):
+    full_name: str
+
+@router.put("/api/users/profile")
+async def update_user_profile(
+    profile: ProfileUpdate,
+    x_user_id: Optional[str] = Header(None, alias="X-User-Id")
+):
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="Missing X-User-Id header")
+
     try:
-        user_id = request.headers.get('X-User-Id')
-        if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "Missing X-User-Id header"
-            }), 401
-
-        data = request.get_json()
-        if not data or 'full_name' not in data:
-            return jsonify({
-                "success": False,
-                "error": "Missing full_name in request body"
-            }), 400
-
         # Update user metadata in Supabase
         update_result = supabase.auth.admin.update_user_by_id(
-            user_id,
-            {"user_metadata": {"name": data['full_name']}}
+            x_user_id,
+            {"user_metadata": {"name": profile.full_name}}
         )
 
         if not update_result.user:
-            return jsonify({
-                "success": False,
-                "error": "Failed to update user profile"
-            }), 500
+            raise HTTPException(status_code=500, detail="Failed to update user profile")
 
-        # Get updated user data from Supabase
-        user_response = supabase.auth.admin.get_user_by_id(user_id)
+        # Get updated user data
+        user_response = supabase.auth.admin.get_user_by_id(x_user_id)
         if not user_response.user:
-            return jsonify({
-                "success": False,
-                "error": "Failed to fetch updated user data"
-            }), 500
+            raise HTTPException(status_code=500, detail="Failed to fetch updated user data")
 
-        return jsonify({
+        return {
             "success": True,
             "message": "Profile updated successfully",
             "data": {
@@ -57,11 +46,7 @@ def update_user_profile():
                 "user_metadata": user_response.user.user_metadata,
                 "app_metadata": user_response.user.app_metadata
             }
-        })
+        }
 
     except Exception as e:
-        print(f"Error updating user profile: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))

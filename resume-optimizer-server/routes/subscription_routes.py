@@ -1,51 +1,33 @@
-from flask import Blueprint, request, jsonify
+from fastapi import FastAPI, APIRouter, Request, HTTPException, Depends
+from fastapi.responses import JSONResponse
 from supabase import create_client, Client
 import os
 import base64
 from dotenv import load_dotenv
-import os
 import openai
 import requests
 import json
-import io
-import base64
-import pdfplumber
-from flask import Flask, request, jsonify, make_response, send_file
-from services.supabase_client import supabase
-from reportlab.lib import colors
-
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowable, ListItem, Table, TableStyle, HRFlowable
-import re
-import tempfile
-import time
-from bs4 import BeautifulSoup
-from supabase import create_client, Client
 import datetime
-import logging
-from flask import Flask, request, jsonify, make_response, send_file
-from flask_cors import CORS
-from requests.auth import HTTPBasicAuth
-from waitress import serve 
+from fastapi.middleware.cors import CORSMiddleware
 
-
-# Create a Blueprint for subscription routes
-subscription_routes = Blueprint('subscription_routes', __name__)
+# Load environment variables
+load_dotenv()
 
 # Initialize Supabase client
 supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_KEY')
 supabase: Client = create_client(supabase_url, supabase_key)
 
-@subscription_routes.route('/api/credits', methods=['GET'])
-def get_user_credits():
+# Create a router for subscription routes
+router = APIRouter()
+
+@router.get('/api/credits')
+async def get_user_credits(request: Request):
     """Get user's current credit balance"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
         credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
         if len(credits_response.data) == 0:
@@ -56,28 +38,26 @@ def get_user_credits():
                 'created_at': datetime.datetime.utcnow().isoformat(),
                 'updated_at': datetime.datetime.utcnow().isoformat()
             }).execute()
-            return jsonify({"credits": 2})
+            return {"credits": 2}
 
-        return jsonify({
-            "credits": credits_response.data[0]['credits_remaining']
-        })
+        return {"credits": credits_response.data[0]['credits_remaining']}
 
     except Exception as e:
         print(f"Error getting user credits: {str(e)}")
-        return jsonify({"error": "Failed to get user credits"}), 500
+        raise HTTPException(status_code=500, detail="Failed to get user credits")
 
-@subscription_routes.route('/api/credits/initialize', methods=['POST'])
-def initialize_credits():
+@router.post('/api/credits/initialize')
+async def initialize_credits(request: Request):
     """Initialize credits for a new user"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
         # Check if user already has credits
         credits_response = supabase.table('usage_credits').select('credits_remaining').eq('user_id', user_id).execute()
         if len(credits_response.data) > 0:
-            return jsonify({"error": "Credits already initialized for this user"}), 400
+            raise HTTPException(status_code=400, detail="Credits already initialized for this user")
 
         # Initialize credits for new user
         supabase.table('usage_credits').insert({
@@ -87,31 +67,31 @@ def initialize_credits():
             'updated_at': datetime.datetime.utcnow().isoformat()
         }).execute()
 
-        return jsonify({
+        return {
             "success": True,
             "message": "Credits initialized successfully",
             "credits": 2
-        })
+        }
 
     except Exception as e:
         print(f"Error initializing credits: {str(e)}")
-        return jsonify({"error": "Failed to initialize credits"}), 500
+        raise HTTPException(status_code=500, detail="Failed to initialize credits")
 
-@subscription_routes.route('/api/credits/purchase', methods=['POST'])
-def purchase_credits():
+@router.post('/api/credits/purchase')
+async def purchase_credits(request: Request):
     """Purchase credits based on selected plan"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
-        data = request.get_json()
+        data = await request.json()
 
         # Calculate credits based on plan
         min_credits = 5
         requested_credits = data.get('credits', min_credits)
         if requested_credits < min_credits:
-            return jsonify({"error": f"Minimum credit purchase is {min_credits}"}), 400
+            raise HTTPException(status_code=400, detail=f"Minimum credit purchase is {min_credits}")
         credits = requested_credits
 
         # Get current credits
@@ -134,23 +114,23 @@ def purchase_credits():
                 'credits_remaining': new_credits
             }).eq('user_id', user_id).execute()
 
-        return jsonify({
+        return {
             "success": True,
             "message": f"Successfully added {credits} credits",
             "new_balance": new_credits
-        })
+        }
 
     except Exception as e:
         print(f"Error purchasing credits: {str(e)}")
-        return jsonify({"error": "Failed to purchase credits"}), 500
+        raise HTTPException(status_code=500, detail="Failed to purchase credits")
 
-@subscription_routes.route('/api/subscriptions', methods=['GET'])
-def get_subscription():
+@router.get('/api/subscriptions')
+async def get_subscription(request: Request):
     """Get user's current subscription status"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
         # Get subscription from Supabase - now without status filter
         subscription_response = supabase.table('subscriptions')\
@@ -162,10 +142,10 @@ def get_subscription():
 
         # If no subscription found at all, return early
         if not subscription_response.data or len(subscription_response.data) == 0:
-            return jsonify({
+            return {
                 "has_subscription": False,
                 "subscription": None
-            })
+            }
 
         # Get the subscription data
         subscription = subscription_response.data[0]
@@ -173,16 +153,16 @@ def get_subscription():
 
         # If no PayPal subscription ID, return just the Supabase data
         if not paypal_subscription_id:
-            return jsonify({
+            return {
                 "has_subscription": subscription.get('status') == 'active',
                 "subscription": subscription
-            })
+            }
 
         # Check PayPal status only if subscription was active
         if subscription.get('status') == 'active':
             access_token = generate_paypal_token()
             if not access_token:
-                return jsonify({"error": "Failed to generate Paypal access token"}), 500
+                raise HTTPException(status_code=500, detail="Failed to generate Paypal access token")
 
             url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}"
             headers = {
@@ -208,42 +188,42 @@ def get_subscription():
                         .eq('id', subscription.get('id'))\
                         .execute()
 
-                    return jsonify({
+                    return {
                         "has_subscription": False,
                         "subscription": subscription,
                         "paypal_subscription": response.json()
-                    })
+                    }
 
-            return jsonify({
+            return {
                 "has_subscription": True,
                 "subscription": subscription,
                 "paypal_subscription": response.json()
-            })
+            }
         
         # For inactive subscriptions, just return the data without PayPal check
-        return jsonify({
+        return {
             "has_subscription": False,
             "subscription": subscription
-        })
+        }
 
     except Exception as e:
         print(f"Error getting subscription: {str(e)}")
-        return jsonify({"error": "Failed to get subscription status"}), 500
+        raise HTTPException(status_code=500, detail="Failed to get subscription status")
 
-@subscription_routes.route('/api/subscriptions', methods=['POST'])
-def create_subscription():
+@router.post('/api/subscriptions')
+async def create_subscription(request: Request):
     """Create or update user subscription"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
-        data = request.get_json()
+        data = await request.json()
         if not data or 'plan_type' not in data:
-            return jsonify({"error": "Plan type is required"}), 400
+            raise HTTPException(status_code=400, detail="Plan type is required")
 
         if not data or 'subscriptionId' not in data:
-            return jsonify({"error": "subscriptionId is required"}), 400
+            raise HTTPException(status_code=400, detail="subscriptionId is required")
 
         plan_type = data['plan_type']
         
@@ -295,27 +275,24 @@ def create_subscription():
                 'updated_at': now.isoformat()
             }).eq('user_id', user_id).execute()
 
-        return jsonify({
+        return {
             "success": True,
             "message": f"Successfully subscribed to {plan_type} plan",
             "subscription": subscription_result.data[0] if subscription_result.data else None,
             "credits": credits
-        })
+        }
 
     except Exception as e:
         print(f"Error creating subscription: {str(e)}")
-        return jsonify({"error": "Failed to create subscription"}), 500
+        raise HTTPException(status_code=500, detail="Failed to create subscription")
 
-@subscription_routes.route('/api/cancel-subscription', methods=['POST'])
-def cancel_subscription():
+@router.post('/api/cancel-subscription')
+async def cancel_subscription(request: Request):
     """Cancel user subscription"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({
-                "success": False,
-                "error": "User ID is required"
-            }), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
         # Get the active subscription for the user
         subscription_result = supabase.table('subscriptions')\
@@ -325,35 +302,23 @@ def cancel_subscription():
             .execute()
 
         if not subscription_result.data:
-            return jsonify({
-                "success": False,
-                "error": "No active subscription found"
-            }), 404
+            raise HTTPException(status_code=404, detail="No active subscription found")
 
         subscription = subscription_result.data[0]
         subscription_id = subscription.get('id')
         paypal_subscription_id = subscription.get('paypal_subscription_id')
 
         if not subscription_id:
-            return jsonify({
-                "success": False,
-                "error": "Invalid subscription ID"
-            }), 400
+            raise HTTPException(status_code=400, detail="Invalid subscription ID")
 
         if not paypal_subscription_id:
-            return jsonify({
-                "success": False,
-                "error": "No PayPal subscription ID found"
-            }), 400
+            raise HTTPException(status_code=400, detail="No PayPal subscription ID found")
 
         # Generate PayPal access token
         try:
             access_token = generate_paypal_token()
         except Exception as e:
-            return jsonify({
-                "success": False,
-                "error": f"Failed to generate PayPal token: {str(e)}"
-            }), 500
+            raise HTTPException(status_code=500, detail=f"Failed to generate PayPal token: {str(e)}")
 
         # First check subscription status in PayPal
         status_url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}"
@@ -381,10 +346,10 @@ def cancel_subscription():
                     .eq('id', subscription_id)\
                     .execute()
 
-                return jsonify({
+                return {
                     "success": True,
                     "message": "Subscription status synchronized with PayPal"
-                })
+                }
 
         # If not cancelled, proceed with cancellation
         cancel_url = f"{os.getenv('PAYPAL_API_URL')}/v1/billing/subscriptions/{paypal_subscription_id}/cancel"
@@ -399,10 +364,7 @@ def cancel_subscription():
         print("PAYPAL RESPONSE CONTENT", cancel_response.content)
 
         if cancel_response.status_code not in [204, 200]:
-            return jsonify({
-                "success": False,
-                "error": f"Failed to cancel PayPal subscription. Status: {cancel_response.status_code}"
-            }), 500
+            raise HTTPException(status_code=500, detail=f"Failed to cancel PayPal subscription. Status: {cancel_response.status_code}")
 
         # Update subscription status in Supabase
         now = datetime.datetime.utcnow()
@@ -415,17 +377,14 @@ def cancel_subscription():
             .eq('id', subscription_id)\
             .execute()
 
-        return jsonify({
+        return {
             "success": True,
             "message": "Subscription cancelled successfully"
-        })
+        }
 
     except Exception as e:
         print(f"Error cancelling subscription: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 def check_user_credits(user_id):
     """Check if user has credits in Supabase"""
@@ -451,26 +410,29 @@ def check_user_credits(user_id):
         print(f"Error checking user credits: {str(e)}")
         return False, {"error": "Failed to check credits"}
 
-@subscription_routes.route('/api/create-paypal-subscription', methods=['POST'])
-def create_paypal_subscription():
+@router.post('/api/create-paypal-subscription')
+async def create_paypal_subscription(request: Request):
     """Create or update user subscription"""
     try:
         user_id = request.headers.get('X-User-Id')
         if not user_id:
-            return jsonify({"error": "User ID is required"}), 401
+            raise HTTPException(status_code=401, detail="User ID is required")
 
-        data = request.get_json()
+        data = await request.json()
         if not data or 'plan_id' not in data:
-            return jsonify({"error": "Plan ID is required"}), 400
+            raise HTTPException(status_code=400, detail="Plan ID is0 required")
         if not data or 'access_token' not in data:
-            return jsonify({"error": "access_token is required"}), 400
+            raise HTTPException(status_code=400, detail="access_token is required")
         plan_id = data['plan_id']
         access_token = data['access_token']
         
-        url = f'https://api-m.sandbox.paypal.com/v1/billing/subscriptions/{subscription_id}'
+        subscription_id = data.get('subscription_id')
+        if not subscription_id:
+            raise HTTPException(status_code=400, detail="subscription_id is required")
+        url = f'{os.getenv("PAYPAL_API_URL")}/v1/billing/subscriptions/{subscription_id}'
 
         if not access_token:
-            return jsonify({"error": "Failed to generate Paypal access token"}), 500
+            raise HTTPException(status_code=500, detail="Failed to generate Paypal access token")
         
         headers = {
             'Content-Type': 'application/json',
@@ -493,16 +455,16 @@ def create_paypal_subscription():
         response = requests.post(url, headers=headers, json=body)
 
         if response.status_code != 201:
-            return jsonify({"error": "Failed to create subscription"}), 500
+            raise HTTPException(status_code=500, detail="Failed to create subscription")
 
-        return jsonify({
+        return {
             "success": True,
             "subscription": response.json()
-        })
+        }
 
     except Exception as e:
         print(f"Error creating subscription: {str(e)}")
-        return jsonify({"error": "Failed to create subscription"}), 500
+        raise HTTPException(status_code=500, detail="Failed to create subscription")
 
 def generate_paypal_token() -> str:
     client_id = os.getenv("PAYPAL_CLIENT_ID")
@@ -511,7 +473,7 @@ def generate_paypal_token() -> str:
     if not client_id or not client_secret:
         raise Exception("Missing PayPal client ID or secret in environment variables.")
     
-    url = "https://api-m.sandbox.paypal.com/v1/oauth2/token"
+    url = os.getenv("PAYPAL_API_URL") + "/v1/oauth2/token"
     auth_header = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
     headers = {
