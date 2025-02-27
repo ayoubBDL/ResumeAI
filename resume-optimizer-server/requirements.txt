@@ -19,3 +19,4 @@ blinker
 uvicorn
 fastapi
 pydantic
+PyPDF2
