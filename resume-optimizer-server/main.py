@@ -40,6 +40,8 @@ origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://resumegen-ai.vercel.app",
+    os.getenv('FRONTEND_URL'),
+    os.getenv('FRONTEND_URL_DEV'),
 ]
 
 app.add_middleware(
